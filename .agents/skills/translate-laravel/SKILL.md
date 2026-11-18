@@ -1,6 +1,6 @@
 ---
 name: translate-laravel
-description: Translate Laravel features into Aurelin faithfully and idiomatically. Use whenever implementing, changing, reviewing, or planning Laravel-equivalent behavior, conventions, generated application code, starter-kit flows, framework APIs, validation, routing, authentication, persistence, queues, mail, events, middleware, configuration, or developer tooling. Requires inspecting the applicable Laravel documentation, source, tests, and official starter implementation before designing Rust code, then reusing Aurelin's mapped crates rather than reinventing upstream functionality.
+description: Translate Laravel features and first-party package boundaries into Aurelin faithfully and idiomatically. Use whenever implementing, changing, reviewing, or planning Laravel-equivalent behavior, package or crate structure, conventions, generated application code, starter-kit flows, framework APIs, validation, routing, authentication, persistence, queues, mail, events, middleware, configuration, or developer tooling. Requires inspecting the applicable Laravel documentation, package ownership, source, tests, and official starter implementation before designing Rust code, then reusing Aurelin's mapped crates rather than reinventing upstream functionality.
 ---
 
 # Translate Laravel
@@ -18,10 +18,23 @@ Before designing or writing feature code:
    - upstream tests;
    - default configuration, migrations, and generated files;
    - official Vue or React starter-kit code.
-3. Use one coherent version. Record the tag, branch plus commit, package version, or stable source URL close to the implementation decision so another developer can reproduce the research.
-4. Distinguish framework defaults from optional packages, configurable behavior, starter-kit behavior, and application-specific examples.
+3. Distinguish framework defaults from optional packages, configurable behavior, starter-kit behavior, and application-specific examples.
+4. Identify the Composer package that owns the behavior and its public integration boundary. Do not infer ownership from the starter file that calls it.
 
 Do not implement from memory, a third-party tutorial, or a Laravel-shaped API guess. Documentation describes the contract, but inspect source and tests whenever sequence, defaults, edge cases, or extension behavior matter.
+
+## Preserve package ownership
+
+Translate Laravel's package ecosystem as part of the architecture, not only its runtime behavior.
+
+1. Map each applicable upstream package to its Aurelin crate before placing code. Use `laravel/framework` as the default owner only for behavior actually supplied by Laravel Framework. Give independent first-party packages such as Fortify an equivalent focused crate.
+2. Keep the same dependency direction: generated applications depend on Aurelin packages; packages must not depend on the CLI or generated starter code.
+3. Keep package-provided workflows, contracts, middleware, controllers, pipelines, and defaults in the equivalent Aurelin crate. Keep application implementations of documented extension contracts, models, migrations, configuration, route selection, and frontend views in the generated application.
+4. Keep the CLI limited to selecting packages, declaring dependencies, and installing application-owned templates. Never use an embedded starter directory as the primary home of reusable framework or package behavior.
+5. Preserve a package boundary by default when it represents an independently versioned Laravel product or a meaningful public integration seam. Do not create one crate per PHP namespace, class, or internal component.
+6. Record deliberate package-boundary deviations and the concrete Rust or dependency constraint that requires them.
+
+For example, translate Laravel Framework hashing, sessions, rate limiting, signed URLs, and password-broker primitives into `aurelin-framework`; translate Fortify's headless authentication workflows and action contracts into an `aurelin-fortify` crate; leave the application's user model, action implementations, migrations, and React or Vue pages in the generated project.
 
 ## Extract the translation contract
 
@@ -46,6 +59,15 @@ Use this as the behavioral contract. Do not turn the research into a speculative
 3. Verify the selected crate's real API, version compatibility, features, maintenance, license, and behavior from authoritative documentation or source.
 4. Identify the exact gap between the verified Laravel contract and what Rust, Aurelin, and the selected crate already provide.
 5. Write only the integration, adaptation, conventions, or starter code needed to close that gap.
+
+Treat crate reuse as an architectural requirement, including inside Aurelin equivalents of Laravel packages:
+
+- Build Aurelin packages by composing the leading crates in `docs/crate-mapping.md`; do not interpret package parity as permission to reimplement their subsystems.
+- Search crates.io, docs.rs, the local dependency graph, and the mapping before writing foundational machinery.
+- Put Laravel-compatible policy, defaults, orchestration, and adaptation around the selected crate while leaving the crate responsible for its established primitive.
+- Add custom machinery only for a verified behavioral gap. State the gap and why the mapped crate cannot satisfy it.
+- If a new crate is a better fit than the mapped candidate, follow the crate-mapping deviation process and update the mapping rather than silently bypassing it.
+- Do not create an Aurelin wrapper that merely renames a clear Rust API. An Aurelin package should add Laravel behavior, package integration, conventions, or a meaningful extension boundary.
 
 Do not recreate an ORM, validator, router, container, event system, queue, mailer, session layer, asset pipeline, or other subsystem when the mapped stack already provides it. Do not wrap a crate merely to make its API look more like PHP when direct use is clear and coherent.
 
@@ -87,6 +109,6 @@ Before completion:
 1. Compare the finished behavior with the extracted Laravel contract.
 2. Run formatting, linting, relevant tests, and generated-application checks.
 3. Review for invented behavior, missing defaults, unnecessary wrappers, duplicated dependency functionality, and stale code or documentation.
-4. State the Laravel revision used, verified behavior, intentional adaptations, and remaining gaps.
+4. State verified behavior, intentional adaptations, and remaining gaps.
 
 Call a feature Laravel-equivalent only when its applicable contract is implemented and tested. Report partial translations precisely.
