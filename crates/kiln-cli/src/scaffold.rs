@@ -66,8 +66,8 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
         dependencies["argon2"] = value("0.6");
         dependencies["axum-login"] = value("0.18");
         dependencies["axum-tower-sessions-csrf"] = value("=0.1.1");
-        dependencies["axum-vite"] = value("0.3.4");
-        dependencies["include_dir"] = value("0.7");
+        dependencies["axum-valid"] = value("0.25");
+        dependencies["governor"] = value("0.10");
         dependencies["serde"] = value({
             let mut dependency = InlineTable::new();
             dependency.insert("version", "1".into());
@@ -75,16 +75,26 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
             dependency
         });
         dependencies["sha2"] = value("0.10");
-        dependencies["sqlx"] = value({
+        dependencies["sea-orm"] = value({
             let mut dependency = InlineTable::new();
-            dependency.insert("version", "0.8".into());
+            dependency.insert("version", "1.1".into());
             dependency.insert("default-features", false.into());
             dependency.insert(
                 "features",
-                ["sqlite", "runtime-tokio-rustls", "macros", "migrate"]
+                ["macros", "runtime-tokio-rustls", "sqlx-sqlite", "sqlite-use-returning-for-3_35"]
                     .into_iter()
                     .collect::<toml_edit::Array>()
                     .into(),
+            );
+            dependency
+        });
+        dependencies["sea-orm-migration"] = value({
+            let mut dependency = InlineTable::new();
+            dependency.insert("version", "1.1".into());
+            dependency.insert("default-features", false.into());
+            dependency.insert(
+                "features",
+                ["runtime-tokio-rustls", "sqlx-sqlite"].into_iter().collect::<toml_edit::Array>().into(),
             );
             dependency
         });
@@ -103,6 +113,14 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
             dependency.insert("features", ["derive"].into_iter().collect::<toml_edit::Array>().into());
             dependency
         });
+        dependencies["vite-rs"] = value({
+            let mut dependency = InlineTable::new();
+            dependency.insert("version", "0.3".into());
+            dependency.insert("default-features", false.into());
+            dependency.insert("features", ["content-hash"].into_iter().collect::<toml_edit::Array>().into());
+            dependency
+        });
+        dependencies["vite-rs-axum-0-8"] = value("0.3");
     }
     let mut tower = InlineTable::new();
     tower.insert("version", "0.5".into());

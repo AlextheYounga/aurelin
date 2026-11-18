@@ -5,8 +5,9 @@ import { defineConfig } from 'vite';
 export default defineConfig({
     base: '/build/',
     plugins: [inertia(), react()],
+    server: { port: 5173, strictPort: true, hmr: { port: 5173 } },
     build: {
         manifest: true,
-        rollupOptions: { input: 'resources/js/app.tsx' },
+        rollupOptions: { input: 'index.html' },
     },
 });

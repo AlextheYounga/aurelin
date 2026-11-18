@@ -15,19 +15,22 @@ pub async fn application(
     database_url: &str,
     secure_cookie: bool,
 ) -> Result<Router, Box<dyn std::error::Error>> {
-    let version = frontend.version().to_owned();
-    let pool = crate::database::connect(database_url).await?;
-    let session_store = SqliteStore::new(pool.clone());
+    let version = frontend.version();
+    let database = crate::database::connect(database_url).await?;
+    let session_store = SqliteStore::new(database.get_sqlite_connection_pool().clone());
     session_store.migrate().await?;
     let session_layer = SessionManagerLayer::new(session_store)
         .with_name("kiln_session")
         .with_secure(secure_cookie);
     let auth_layer =
-        AuthManagerLayerBuilder::new(AuthBackend::new(pool).await?, session_layer).build();
+        AuthManagerLayerBuilder::new(AuthBackend::new(database).await?, session_layer).build();
 
     Ok(Router::new()
         .merge(crate::routes::http::routes())
         .merge(crate::routes::authentication::routes())
+        .merge(crate::routes::email_verification::routes())
+        .merge(crate::routes::password_reset::routes())
+        .merge(crate::routes::password_confirmation::routes())
         .nest("/build", frontend.asset_routes())
         .layer(VersionLayer::new(version))
         .layer(middleware::from_fn(CsrfMiddleware::middleware))

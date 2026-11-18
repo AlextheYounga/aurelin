@@ -10,8 +10,10 @@ use tokio::net::TcpListener;
 mod auth;
 pub mod bootstrap;
 mod database;
+mod entities;
 pub mod frontend;
 pub mod frontend_config;
+mod migration;
 pub mod routes;
 
 pub async fn run() -> Result<(), Box<dyn Error>> {
@@ -24,14 +26,14 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
     let database_url = environment
         .get("DATABASE_URL")
         .map(String::as_str)
-        .unwrap_or("sqlite://database.sqlite");
+        .unwrap_or("sqlite://database.sqlite?mode=rwc");
     let secure_cookie = environment
         .get("SESSION_SECURE_COOKIE")
         .map(String::as_str)
         .unwrap_or("false")
         .parse::<bool>()?;
     let frontend = frontend::Frontend::new();
-    let _dev_server = frontend.start_dev_server()?;
+    let _dev_server = frontend.start_dev_server();
     let listener = TcpListener::bind((config.host.as_str(), config.port)).await?;
     tracing::info!(address = %listener.local_addr()?, "Kiln listening");
     let application = bootstrap::application(frontend, database_url, secure_cookie).await?;

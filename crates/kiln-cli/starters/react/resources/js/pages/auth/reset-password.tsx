@@ -12,12 +12,11 @@ export default function ResetPassword({ csrf_token, email, token, errors }: Prop
         <main>
             <Head title="Reset password" />
             <h1>Reset password</h1>
-            <Form action="/reset-password" method="post" headers={{ 'x-csrf-token': csrf_token }}>
+            <Form action={`/reset-password/${token}?email=${encodeURIComponent(email)}`} method="post" headers={{ 'x-csrf-token': csrf_token }}>
                 {({ processing }) => (
                     <>
-                        <input type="hidden" name="token" value={token} />
                         <label htmlFor="email">Email address</label>
-                        <input id="email" name="email" type="email" value={email} readOnly autoComplete="email" />
+                        <input id="email" type="email" value={email} readOnly autoComplete="email" />
                         {errors.email && <p role="alert">{errors.email}</p>}
                         <label htmlFor="password">Password</label>
                         <input id="password" name="password" type="password" required autoFocus autoComplete="new-password" />

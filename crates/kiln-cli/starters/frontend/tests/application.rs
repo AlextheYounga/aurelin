@@ -5,7 +5,9 @@ use kiln_framework::axum::{
     http::{Request, StatusCode},
 };
 use __KILN_CRATE__::{
-    bootstrap::application, frontend::Frontend, frontend_config::WELCOME_COMPONENT,
+    bootstrap::application,
+    frontend::Frontend,
+    frontend_config::{DEV_SCRIPT, WELCOME_COMPONENT},
 };
 use tower::ServiceExt;
 
@@ -18,7 +20,7 @@ async fn initial_visit_contains_the_inertia_page_and_vite_entry() -> Result<(), 
     assert_eq!(response.status(), StatusCode::OK);
     let body = String::from_utf8(to_bytes(response.into_body(), usize::MAX).await?.to_vec())?;
     assert!(body.contains(&format!(r#""component":"{WELCOME_COMPONENT}""#)));
-    assert!(body.contains("/build/resources/js/app."));
+    assert!(body.contains(&format!("/{DEV_SCRIPT}")));
     assert!(body.contains("data-page=\"app\""));
     Ok(())
 }

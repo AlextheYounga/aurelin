@@ -13,10 +13,9 @@ defineProps<{
     <main>
         <Head title="Reset password" />
         <h1>Reset password</h1>
-        <Form action="/reset-password" method="post" :headers="{ 'x-csrf-token': csrf_token }" v-slot="{ processing }">
-            <input type="hidden" name="token" :value="token" />
+        <Form :action="`/reset-password/${token}?email=${encodeURIComponent(email)}`" method="post" :headers="{ 'x-csrf-token': csrf_token }" v-slot="{ processing }">
             <label for="email">Email address</label>
-            <input id="email" name="email" type="email" :value="email" readonly autocomplete="email" />
+            <input id="email" type="email" :value="email" readonly autocomplete="email" />
             <p v-if="errors.email" role="alert">{{ errors.email }}</p>
             <label for="password">Password</label>
             <input id="password" name="password" type="password" required autofocus autocomplete="new-password" />

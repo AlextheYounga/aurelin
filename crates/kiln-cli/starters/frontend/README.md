@@ -16,16 +16,16 @@ npm run typecheck
 npm run build
 ```
 
-For a production binary, build the frontend before compiling in release mode;
-the Vite output is embedded in the executable:
+For a production binary, `vite-rs` runs the Vite build and embeds its output
+while Cargo compiles the release executable:
 
 ```sh
-npm run build
 cargo build --release
 ```
 
 Routes live in `src/routes/`, application composition in `src/bootstrap.rs`,
-and pages in `resources/js/pages`. The starter includes SQLite-backed
-registration, login, logout, password-reset token handling, persisted sessions,
-CSRF protection, and login throttling. It does not yet include email
-verification, password confirmation, or production mail delivery.
+and pages in `resources/js/pages`. SeaORM and SeaQuery migrations provide the
+SQLite data layer. The starter includes registration, login, logout,
+password-reset token handling, email verification, password confirmation,
+persisted sessions, CSRF protection, and login throttling. It does not yet
+include production mail delivery or confirmed-route enforcement.

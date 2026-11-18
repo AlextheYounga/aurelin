@@ -59,8 +59,57 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
             None,
         )?)
         .await?;
-    assert_eq!(dashboard.status(), StatusCode::OK);
-    let logout_csrf = csrf_token(dashboard).await?;
+    assert_eq!(dashboard.status(), StatusCode::FOUND);
+    assert_eq!(dashboard.headers()[header::LOCATION], "/verify-email");
+
+    let verification = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            "/verify-email",
+            Some(&authenticated_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    assert_eq!(verification.status(), StatusCode::OK);
+    let authenticated_csrf = csrf_token(verification).await?;
+
+    let resent = app
+        .clone()
+        .oneshot(request(
+            Method::POST,
+            "/email/verification-notification",
+            Some(&authenticated_cookie),
+            Some(&authenticated_csrf),
+            Some("{}"),
+        )?)
+        .await?;
+    assert_eq!(resent.status(), StatusCode::SEE_OTHER);
+
+    let confirmation = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            "/confirm-password",
+            Some(&authenticated_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    assert_eq!(confirmation.status(), StatusCode::OK);
+
+    let confirmed = app
+        .clone()
+        .oneshot(request(
+            Method::POST,
+            "/confirm-password",
+            Some(&authenticated_cookie),
+            Some(&authenticated_csrf),
+            Some(r#"{"password":"correct-horse"}"#),
+        )?)
+        .await?;
+    assert_eq!(confirmed.status(), StatusCode::SEE_OTHER);
 
     let logged_out = app
         .clone()
@@ -68,11 +117,21 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
             Method::POST,
             "/logout",
             Some(&authenticated_cookie),
-            Some(&logout_csrf),
+            Some(&authenticated_csrf),
             Some("{}"),
         )?)
         .await?;
     assert_eq!(logged_out.status(), StatusCode::SEE_OTHER);
+
+    let unauthenticated_confirmation = app
+        .clone()
+        .oneshot(request(Method::GET, "/confirm-password", None, None, None)?)
+        .await?;
+    assert_eq!(unauthenticated_confirmation.status(), StatusCode::FOUND);
+    assert_eq!(
+        unauthenticated_confirmation.headers()[header::LOCATION],
+        "/login"
+    );
 
     let login_page = app
         .clone()

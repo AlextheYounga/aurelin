@@ -1,9 +1,10 @@
 pub const FRAMEWORK: &str = "vue";
 pub const DEV_SCRIPT: &str = "resources/js/app.ts";
-pub const MANIFEST_KEY: &str = "resources/js/app.ts";
 pub const WELCOME_COMPONENT: &str = "Welcome";
 pub const LOGIN_COMPONENT: &str = "auth/Login";
 pub const REGISTER_COMPONENT: &str = "auth/Register";
 pub const DASHBOARD_COMPONENT: &str = "Dashboard";
 pub const FORGOT_PASSWORD_COMPONENT: &str = "auth/ForgotPassword";
 pub const RESET_PASSWORD_COMPONENT: &str = "auth/ResetPassword";
+pub const CONFIRM_PASSWORD_COMPONENT: &str = "auth/ConfirmPassword";
+pub const VERIFY_EMAIL_COMPONENT: &str = "auth/VerifyEmail";

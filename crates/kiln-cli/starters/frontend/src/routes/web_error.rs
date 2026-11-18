@@ -22,6 +22,8 @@ pub(super) enum WebError {
     Inertia(#[from] InertiaError),
     #[error(transparent)]
     Session(#[from] session::Error),
+    #[error("system clock is before the Unix epoch")]
+    Clock(#[from] std::time::SystemTimeError),
 }
 
 impl IntoResponse for WebError {
