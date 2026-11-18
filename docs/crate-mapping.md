@@ -1,8 +1,8 @@
 # Rust crate mapping for Laravel capabilities
 
-**Research snapshot:** 2026-11-18. This is a research shortlist, not a set of
-selected dependencies or a claim of Laravel parity. Nothing here has been
-installed in Aurelin.
+**Research snapshot:** 2026-11-18. This began as a research shortlist and now
+also records selected dependencies. Selection does not by itself claim Laravel
+parity.
 
 **How to read this mapping:** every row names one **leading candidate** (bold)
 — the crate to verify first for that capability. A second crate appears only
@@ -35,7 +35,7 @@ reuse; it does not mean every row belongs in v1.
 | Browser sessions and session persistence | **tower-sessions** + **tower-sessions-sqlx-store** or **tower-sessions-redis-store** | Pluggable `SessionStore` with middleware/extractor integration. Note: tower-sessions-redis-store (0.17) is built on **fred ^10**, which fixes the Redis client choice for the whole app (see Cache). Verify cookie attributes, expiration, regeneration, and flash data against Laravel session behavior; PHP-serialized Laravel sessions are not directly interchangeable. |
 | Authentication, guards, login state | **axum-login** (built on tower-sessions) | Session-backed authentication with backend traits and route protection. Not a complete Laravel auth starter: registration, password reset, email verification, confirmation, throttling, redirects, and starter screens are Aurelin-side against the Laravel 13 baseline. |
 | OAuth / OpenID Connect | **openidconnect** (built on `oauth2`) | The leading protocol crate; wire it into routes and sessions directly. A tiny alpha adapter (`axum-open-id-connect`, no stable release) exists but is not recommended. Optional capability, not part of the auth starter. |
-| Password hashing | **argon2** (RustCrypto); higher-level alternative: `password-auth` | Argon2id with the `password-hash` interface; password-auth offers a simpler API that also understands bcrypt/scrypt PHC strings. Match Laravel's actually-configured driver and rehash-on-login strategy; run hashing off the async path. |
+| Password hashing | **bcrypt** for Laravel's default; `argon2` as an explicit alternative | Laravel 13 defaults to bcrypt with cost 12. Aurelin uses the maintained `bcrypt` crate off the async executor for compatible generated defaults. Argon2 may be exposed later as an explicit configured driver, not a silent substitution. |
 | Authorization (gates/policies) | No crate reproduces Laravel gates/policies; **implement Aurelin-side** over the `axum-login` authenticated-user seam | Gates and policies are app-defined checks over the authenticated user; a thin Aurelin layer matches them more faithfully than a policy engine. Adopt `casbin` (ACL/RBAC/ABAC; explicitly no authentication or user management) only if a real policy-engine requirement emerges. |
 | CSRF protection | **axum-tower-sessions-csrf** (synchronizer token, on tower-sessions); stateless alternative: `tower-http` csrf (fetch-metadata via `Sec-Fetch-Site`/`Origin`, no token state) | Two verified approaches, not competing features: the token middleware matches Laravel's synchronizer-token model; tower-http matches the modern fetch-metadata approach. Choose by the behavior to match, plus Inertia/Axios cookie and header expectations. axum-tower-sessions-csrf is MIT OR LGPL-3.0-or-later — check license fit. |
 | Cookie parsing, signing, encryption | **cookie** (+ `axum-extra` cookie extractors) | Signed/private jars plus axum extractors. Signing is integrity, not confidentiality. Key generation, rotation, secure attributes, and Laravel cookie interoperability are integration concerns. |
@@ -68,7 +68,7 @@ reuse; it does not mean every row belongs in v1.
 1. **axum + tower + tower-http** — HTTP/Tower foundation.
 2. **sea-orm (on sqlx)** — data layer; fall back to sqlx alone if no ORM is
    wanted.
-3. **tower-sessions + axum-login + argon2** — authentication building blocks;
+3. **tower-sessions + axum-login + bcrypt** — authentication building blocks;
    the complete Laravel 13 starter behavior is Aurelin-side.
 4. **validator + axum-valid** — request validation.
 5. **inertia_rs (axum feature)** — Inertia v3 server protocol; run a
@@ -90,6 +90,11 @@ reuse; it does not mean every row belongs in v1.
 - Authentication starter kits are a composed experience, not just login
   middleware. The baseline remains the built-in authentication variant of the
   Laravel 13 official Vue/React starter kits documented in `CONTEXT.md`.
+- Governor and tower-governor use replenishing GCRA/token-bucket semantics,
+  while Laravel's login limiter uses a fixed decay window and reports its
+  remaining retry delay. Aurelin's small fixed-window adapter is a documented
+  deviation for that behavior; general HTTP throttling should still verify
+  Governor first.
 - Do not select both options within a row (two ORMs, two validation libraries,
   two Redis clients, two Inertia adapters) without a demonstrated integration
   requirement; the bold candidate is the one to verify first.
@@ -108,7 +113,7 @@ Primary candidate documentation and crate pages (accessed 2026-11-18):
 
 - [Axum](https://docs.rs/axum/latest/axum/), [Tower HTTP](https://docs.rs/tower-http/latest/tower_http/), [Tower](https://docs.rs/tower/latest/tower/)
 - [SQLx](https://docs.rs/sqlx/latest/sqlx/), [SeaORM](https://www.sea-ql.org/SeaORM/), [Diesel](https://docs.rs/diesel/latest/diesel/), [SeaQuery](https://docs.rs/sea-query/latest/sea_query/), [Refinery](https://docs.rs/refinery/latest/refinery/)
-- [Axum Login](https://docs.rs/axum-login/latest/axum_login/), [Tower Sessions](https://docs.rs/tower-sessions/latest/tower_sessions/), [Argon2](https://docs.rs/argon2/latest/argon2/), [Casbin](https://casbin.apache.org/docs/rust-rbac-tutorial/)
+- [Axum Login](https://docs.rs/axum-login/latest/axum_login/), [Tower Sessions](https://docs.rs/tower-sessions/latest/tower_sessions/), [bcrypt](https://docs.rs/bcrypt/latest/bcrypt/), [Argon2](https://docs.rs/argon2/latest/argon2/), [Casbin](https://casbin.apache.org/docs/rust-rbac-tutorial/)
 - [Apalis](https://docs.rs/apalis/latest/apalis/), [Apalis Cron](https://docs.rs/apalis-cron/latest/apalis_cron/), [SQLxMQ](https://docs.rs/sqlxmq/latest/sqlxmq/)
 - [Lettre](https://docs.rs/lettre/latest/lettre/), [object_store](https://docs.rs/object_store/latest/object_store/), [Moka](https://docs.rs/moka/latest/moka/), [fred](https://docs.rs/fred/latest/fred/)
 - [inertia_rs repository](https://github.com/stuarth/inertia-rs), [Inertia Omega repository](https://github.com/inertiajs/inertia-omega), [Inertia protocol](https://inertiajs.com/the-protocol)

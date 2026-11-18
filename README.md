@@ -13,6 +13,8 @@ The repository currently provides foundational, tested behavior:
 - Axum routes and Tokio HTTP serving;
 - a health endpoint and graceful shutdown;
 - an Inertia 3 Axum integration verified at the protocol boundary;
+- framework-owned authentication primitives and a separate headless
+  `aurelin-fortify` package;
 - minimal React 19 and Vue 3 Inertia starters with Vite development and
   embedded production assets;
 - a shared SQLite authentication foundation with registration, login, logout,

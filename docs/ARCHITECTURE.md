@@ -11,6 +11,7 @@ aurelin/
 ├── CONTEXT.md
 ├── crates/
 │   ├── aurelin-framework/       # Runtime integration and conventions
+│   ├── aurelin-fortify/         # Headless authentication package
 │   └── aurelin-cli/             # Project generator and embedded starters
 │       └── starters/base/
 └── laravel -> ...            # Local Laravel source reference, not a dependency
@@ -99,23 +100,30 @@ the resulting `dist` files into the executable.
 
 ### Authentication foundation
 
-Both frontend variants now share registration, login, logout, protected
-dashboard, password-reset, email-verification, and password-confirmation routes
-and screens. SeaORM 1.1 provides the application data layer, SeaQuery-backed
-`sea-orm-migration` migrations own the SQLite schema, and SQLx remains only as
-SeaORM's driver and the mapped Tower session-store infrastructure. `axum-valid`
-integrates `validator` with Axum request extraction. `axum-login` 0.18 provides
-authenticated sessions and session-ID rotation, `tower-sessions` 0.14 plus its
-compatible SQLx store persists sessions, Argon2id hashes passwords off the
-async executor, and `axum-tower-sessions-csrf` 0.1.1 validates state-changing
-requests. Governor limits login attempts to five per minute per lowercased
-email and client IP, matching Laravel's default key and threshold.
+Authentication follows Laravel's package boundary. `aurelin-framework` owns
+framework primitives: bcrypt hashing with Laravel's default cost, password
+reset token lifecycle, fixed-window rate limiting, temporary signed URLs, and
+Laravel-compatible session defaults. `aurelin-fortify` owns Fortify's
+application action contracts and login-rate-limit convention. Generated
+applications provide user persistence, migrations, action implementations,
+route/view selection, and frontend pages. The CLI only installs those packages
+and application-owned templates.
 
-Password-reset and email-verification tokens are random, stored only as SHA-256
-digests, expire after 60 minutes, and are consumed transactionally with their
-state changes. Password confirmation verifies the current password and records
-the confirmation time in the session. The current development notification
-path logs reset and verification URLs. Production mail delivery,
+Both frontend variants share registration, login, logout, protected dashboard,
+password-reset, email-verification, and password-confirmation routes and
+screens. SeaORM 1.1 provides application data access, SeaQuery-backed
+`sea-orm-migration` owns the SQLite schema, and SQLx remains SeaORM's driver and
+the Tower session-store infrastructure. `axum-valid` integrates `validator`
+with Axum request extraction. `axum-login` 0.18 provides authenticated sessions
+and session-ID rotation, and `axum-tower-sessions-csrf` 0.1.1 validates
+state-changing requests.
+
+Password-reset tokens are random, stored only as SHA-256 digests, expire after
+60 minutes, and are consumed transactionally with password changes. Email
+verification uses Fortify-owned temporary signed URLs backed by `APP_KEY`
+instead of application token storage. Password confirmation verifies the
+current password and records the confirmation time in the session. The current
+development notification path logs reset and verification URLs. Production mail delivery,
 confirmed-route freshness enforcement, and remaining official starter behavior
 are not implemented, so this remains a partial authentication starter rather
 than a parity claim.
@@ -123,20 +131,6 @@ than a parity claim.
 Generated applications keep reusable behavior in a library target and a thin
 binary entry point. All Rust tests live in each crate's root `tests/` directory;
 production `src/` trees contain no inline test modules or test-only seams.
-
-## Behavior references
-
-- Laravel framework checkout: `v13.40.0-3-gddbf5ebcde`, revision
-  `ddbf5ebcdef2be42d326c8c909c9e40228d9e517`.
-- Laravel application skeleton `13.x`: revision
-  `a255d7688770af9713daff1439c47ff9bc6abd47` (2026-11-13).
-- Laravel 13 request lifecycle, routing, configuration, and starter-kit docs,
-  accessed 2026-11-18.
-- Official Vue starter: revision
-  `1959e1a26b1cabd02037c30210e14c5752d2b431`.
-- Official React starter: revision
-  `012f4248f70e255e32ad93f540aca5fb7e8c96fe`.
-- `inertia_rs` 0.4.0 protocol support matrix and Axum source.
 
 ## Growth rule
 
