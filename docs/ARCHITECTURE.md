@@ -89,32 +89,36 @@ plugin, entry point, and page component. The versions verified by the starter
 are Inertia client/Vite plugin 3.11, React 19, Vue 3.5, TypeScript 5.9, and Vite
 8. The generated lock files make those checks reproducible.
 
-`axum-vite` 0.3.4 supplies the integration that Kiln would otherwise have to
-write: Vite proxying and HMR in development, React's refresh preamble, manifest
-entry resolution, immutable production asset serving, and embedding `dist` in
-the release binary. It is MIT OR Apache-2.0 and uses Axum 0.8. Kiln adds only
-the Inertia root document and asset version wiring. A generated app starts Vite
-as a managed child in debug builds and terminates it when the backend exits.
-Production follows Laravel's build-before-deploy workflow: `npm run build`
-must precede `cargo build --release`.
+`vite-rs` 0.3 and its Axum 0.8 adapter provide the mapped integration: a
+managed Vite development server, Tower asset service, release builds, and
+embedded production output. Kiln supplies the dynamic Inertia root document,
+React refresh preamble in development, and asset-version wiring. A generated
+app starts Vite as a managed child in debug builds and terminates it when the
+backend exits. During `cargo build --release`, `vite-rs` runs Vite and embeds
+the resulting `dist` files into the executable.
 
 ### Authentication foundation
 
-Both frontend variants now share real registration, login, logout, protected
-dashboard, and password-reset routes and screens. SQLx owns the initial SQLite
-schema and parameterized user queries. `axum-login` 0.18 provides authenticated
-sessions and session-ID rotation, `tower-sessions` 0.14 plus the exactly pinned
+Both frontend variants now share registration, login, logout, protected
+dashboard, password-reset, email-verification, and password-confirmation routes
+and screens. SeaORM 1.1 provides the application data layer, SeaQuery-backed
+`sea-orm-migration` migrations own the SQLite schema, and SQLx remains only as
+SeaORM's driver and the mapped Tower session-store infrastructure. `axum-valid`
+integrates `validator` with Axum request extraction. `axum-login` 0.18 provides
+authenticated sessions and session-ID rotation, `tower-sessions` 0.14 plus its
 compatible SQLx store persists sessions, Argon2id hashes passwords off the
 async executor, and `axum-tower-sessions-csrf` 0.1.1 validates state-changing
-requests. Login failures are limited to five per minute per lowercased email
-and client IP, matching Laravel's default key and threshold.
+requests. Governor limits login attempts to five per minute per lowercased
+email and client IP, matching Laravel's default key and threshold.
 
-Password-reset tokens are random, stored only as SHA-256 digests, expire after
-60 minutes, and are consumed transactionally with the password update. The
-current development notification path logs the reset URL. A production mail
-transport, email verification, password confirmation, and remaining official
-starter behavior are not implemented, so this remains a partial authentication
-starter rather than a parity claim.
+Password-reset and email-verification tokens are random, stored only as SHA-256
+digests, expire after 60 minutes, and are consumed transactionally with their
+state changes. Password confirmation verifies the current password and records
+the confirmation time in the session. The current development notification
+path logs reset and verification URLs. Production mail delivery,
+confirmed-route freshness enforcement, and remaining official starter behavior
+are not implemented, so this remains a partial authentication starter rather
+than a parity claim.
 
 Generated applications keep reusable behavior in a library target and a thin
 binary entry point. All Rust tests live in each crate's root `tests/` directory;

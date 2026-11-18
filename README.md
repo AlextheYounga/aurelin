@@ -16,13 +16,14 @@ The repository currently provides foundational, tested behavior:
 - minimal React 19 and Vue 3 Inertia starters with Vite development and
   embedded production assets;
 - a shared SQLite authentication foundation with registration, login, logout,
-  login throttling, CSRF protection, persisted sessions, and password-reset
-  screens and token handling.
+  login throttling, CSRF protection, persisted sessions, password reset, email
+  verification, and password confirmation.
 
-The authentication starter is still incomplete: email verification, password
-confirmation, production mail delivery, and the remaining Laravel starter-kit
-behavior are not implemented. See `CONTEXT.md` for the target and
-`docs/ARCHITECTURE.md` for exact implementation status and references.
+The authentication starter is still incomplete: notifications are logged in
+development rather than delivered through production mail, and confirmed-route
+enforcement and remaining Laravel starter-kit behavior are not implemented. See
+`CONTEXT.md` for the target and `docs/ARCHITECTURE.md` for exact implementation
+status and references.
 
 ## Try the backend foundation
 
