@@ -8,3 +8,6 @@ name = "kiln"
 path = "src/main.rs"
 
 [dependencies]
+
+[lints]
+workspace = true

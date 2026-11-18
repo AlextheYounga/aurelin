@@ -45,3 +45,14 @@ the workspace organized under `crates/` without speculatively mapping Laravel's
 subsystems or creating placeholder templates. For v1, prefer integrating
 existing Rust crates and frontend packages over reimplementing their
 functionality.
+
+## Rust quality checks
+
+Workspace crates inherit the Clippy lint policy from the root `Cargo.toml`.
+Clippy thresholds are in `clippy.toml`, and formatting is configured in
+`rustfmt.toml`. Run the checks from the repository root:
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+```
