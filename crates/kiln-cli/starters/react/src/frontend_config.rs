@@ -1,0 +1,9 @@
+pub const FRAMEWORK: &str = "react";
+pub const DEV_SCRIPT: &str = "resources/js/app.tsx";
+pub const MANIFEST_KEY: &str = "resources/js/app.tsx";
+pub const WELCOME_COMPONENT: &str = "welcome";
+pub const LOGIN_COMPONENT: &str = "auth/login";
+pub const REGISTER_COMPONENT: &str = "auth/register";
+pub const DASHBOARD_COMPONENT: &str = "dashboard";
+pub const FORGOT_PASSWORD_COMPONENT: &str = "auth/forgot-password";
+pub const RESET_PASSWORD_COMPONENT: &str = "auth/reset-password";
