@@ -1,28 +1,29 @@
 use std::{
-    collections::HashMap,
-    num::NonZeroU32,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use argon2::{
-    Argon2,
-    password_hash::{PasswordHasher, PasswordVerifier, phc::PasswordHash},
+use aurelin_fortify::{
+    CreatesNewUsers, EmailVerification, EmailVerificationError, EmailVerificationRequest,
+    LoginRateLimiter, RegistrationInput,
+};
+use aurelin_framework::auth::{
+    BcryptPasswordHasher, ConsumedPasswordReset, PasswordHashError, PasswordResetBroker,
+    PasswordResetCredentials, PasswordResetError, PasswordResetRepository, PasswordResetRequest,
+    StoredPasswordResetToken,
 };
 use axum_login::{AuthUser, AuthnBackend, UserId};
-use governor::{DefaultDirectRateLimiter, Quota, RateLimiter};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
-    QueryFilter, SqlErr, TransactionTrait, sea_query::OnConflict,
+    QueryFilter, TransactionTrait, sea_query::OnConflict,
 };
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 use thiserror::Error;
-use tokio::{sync::Mutex, task::JoinError};
 
-use crate::entities::{email_verification_token, password_reset_token, user};
-
-const TOKEN_LIFETIME_SECONDS: i64 = 60 * 60;
+use crate::{
+    actions::{CreateNewUser, CreateNewUserError, CreateUser},
+    entities::{password_reset_token, user},
+};
 
 pub type AuthSession = axum_login::AuthSession<AuthBackend>;
 pub type User = user::Model;
@@ -68,16 +69,28 @@ pub struct Credentials {
 pub struct AuthBackend {
     database: DatabaseConnection,
     dummy_password_hash: Arc<String>,
-    attempts: LoginAttempts,
+    passwords: BcryptPasswordHasher,
+    attempts: LoginRateLimiter,
+    password_resets: PasswordResetBroker<AuthRepository>,
+    create_new_user: CreateNewUser,
+    email_verification: EmailVerification,
 }
 
 impl AuthBackend {
-    pub async fn new(database: DatabaseConnection) -> Result<Self, AuthError> {
-        let dummy_password_hash = hash_password("aurelin-invalid-credentials").await?;
+    pub async fn new(
+        database: DatabaseConnection,
+        application_key: &[u8],
+    ) -> Result<Self, AuthError> {
+        let passwords = BcryptPasswordHasher::default();
+        let dummy_password_hash = passwords.hash("aurelin-invalid-credentials").await?;
         Ok(Self {
+            password_resets: PasswordResetBroker::new(AuthRepository(database.clone())),
+            create_new_user: CreateNewUser::new(database.clone(), passwords),
+            email_verification: EmailVerification::new(application_key)?,
             database,
             dummy_password_hash: Arc::new(dummy_password_hash),
-            attempts: LoginAttempts::new()?,
+            passwords,
+            attempts: LoginRateLimiter::default(),
         })
     }
 
@@ -87,27 +100,22 @@ impl AuthBackend {
         email: &str,
         password: &str,
     ) -> Result<CreateUser, AuthError> {
-        let now = unix_timestamp()?;
-        let active_user = user::ActiveModel {
-            name: Set(name.to_owned()),
-            email: Set(normalize_email(email)),
-            password_hash: Set(hash_password(password).await?),
-            created_at: Set(now),
-            updated_at: Set(now),
-            ..Default::default()
-        };
-
-        match active_user.insert(&self.database).await {
-            Ok(user) => Ok(CreateUser::Created(user)),
-            Err(error) if matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) => {
-                Ok(CreateUser::EmailAlreadyExists)
-            }
-            Err(error) => Err(error.into()),
-        }
+        Ok(self
+            .create_new_user
+            .create(RegistrationInput {
+                name: name.to_owned(),
+                email: email.to_owned(),
+                password: password.to_owned(),
+            })
+            .await?)
     }
 
     pub async fn too_many_login_attempts(&self, key: &str) -> bool {
-        self.attempts.check(key).await
+        if self.attempts.retry_after(key).await.is_some() {
+            return true;
+        }
+        self.attempts.hit(key).await;
+        false
     }
 
     pub async fn clear_login_attempts(&self, key: &str) {
@@ -119,32 +127,16 @@ impl AuthBackend {
         email: &str,
     ) -> Result<Option<String>, AuthError> {
         let email = normalize_email(email);
-        if user::Entity::find()
-            .filter(user::Column::Email.eq(&email))
-            .one(&self.database)
-            .await?
-            .is_none()
-        {
-            return Ok(None);
-        }
-
-        let token = axum_tower_sessions_csrf::generate_token();
-        password_reset_token::Entity::insert(password_reset_token::ActiveModel {
-            email: Set(email),
-            token_hash: Set(token_digest(&token)),
-            created_at: Set(unix_timestamp()?),
-        })
-        .on_conflict(
-            OnConflict::column(password_reset_token::Column::Email)
-                .update_columns([
-                    password_reset_token::Column::TokenHash,
-                    password_reset_token::Column::CreatedAt,
-                ])
-                .to_owned(),
+        Ok(
+            match self
+                .password_resets
+                .create_token(&email, unix_timestamp()?)
+                .await?
+            {
+                PasswordResetRequest::Sent { token } => Some(token),
+                PasswordResetRequest::UnknownUser | PasswordResetRequest::Throttled => None,
+            },
         )
-        .exec(&self.database)
-        .await?;
-        Ok(Some(token))
     }
 
     pub async fn reset_password(
@@ -154,82 +146,51 @@ impl AuthBackend {
         password: &str,
     ) -> Result<bool, AuthError> {
         let email = normalize_email(email);
-        let transaction = self.database.begin().await?;
-        let Some(reset_token) = password_reset_token::Entity::find_by_id(&email)
-            .one(&transaction)
-            .await?
-        else {
-            return Ok(false);
-        };
-        if reset_token.token_hash != token_digest(token)
-            || reset_token.created_at < unix_timestamp()? - TOKEN_LIFETIME_SECONDS
-        {
-            return Ok(false);
-        }
-        let Some(user) = user::Entity::find()
-            .filter(user::Column::Email.eq(&email))
-            .one(&transaction)
-            .await?
-        else {
-            return Ok(false);
-        };
-
-        let mut user: user::ActiveModel = user.into();
-        user.password_hash = Set(hash_password(password).await?);
-        user.updated_at = Set(unix_timestamp()?);
-        user.update(&transaction).await?;
-        password_reset_token::Entity::delete_by_id(&email)
-            .exec(&transaction)
-            .await?;
-        transaction.commit().await?;
-        Ok(true)
+        Ok(self
+            .password_resets
+            .reset(
+                PasswordResetCredentials {
+                    email: &email,
+                    token,
+                    password,
+                },
+                unix_timestamp()?,
+            )
+            .await?)
     }
 
-    pub async fn create_email_verification_token(&self, user_id: i64) -> Result<String, AuthError> {
-        let token = axum_tower_sessions_csrf::generate_token();
-        email_verification_token::Entity::insert(email_verification_token::ActiveModel {
-            user_id: Set(user_id),
-            token_hash: Set(token_digest(&token)),
-            created_at: Set(unix_timestamp()?),
-        })
-        .on_conflict(
-            OnConflict::column(email_verification_token::Column::UserId)
-                .update_columns([
-                    email_verification_token::Column::TokenHash,
-                    email_verification_token::Column::CreatedAt,
-                ])
-                .to_owned(),
-        )
-        .exec(&self.database)
-        .await?;
-        Ok(token)
+    pub fn email_verification_url(&self, user: &User) -> Result<String, AuthError> {
+        Ok(self
+            .email_verification
+            .url(user.id, &user.email, unix_timestamp()?)?)
     }
 
-    pub async fn verify_email(&self, user_id: i64, token: &str) -> Result<bool, AuthError> {
-        let transaction = self.database.begin().await?;
-        let Some(verification_token) = email_verification_token::Entity::find_by_id(user_id)
-            .one(&transaction)
-            .await?
-        else {
-            return Ok(false);
-        };
-        if verification_token.token_hash != token_digest(token)
-            || verification_token.created_at < unix_timestamp()? - TOKEN_LIFETIME_SECONDS
-        {
+    pub async fn verify_email(
+        &self,
+        user: &User,
+        email_hash: &str,
+        expires: i64,
+        signature: &str,
+    ) -> Result<bool, AuthError> {
+        if !self.email_verification.verify(
+            EmailVerificationRequest {
+                user_id: user.id,
+                email: &user.email,
+                email_hash,
+                expires,
+                signature,
+            },
+            unix_timestamp()?,
+        )? {
             return Ok(false);
         }
-        let Some(user) = user::Entity::find_by_id(user_id).one(&transaction).await? else {
-            return Ok(false);
-        };
-
-        let mut user: user::ActiveModel = user.into();
+        if user.email_verified_at.is_some() {
+            return Ok(true);
+        }
+        let mut user: user::ActiveModel = user.clone().into();
         user.email_verified_at = Set(Some(unix_timestamp()?));
         user.updated_at = Set(unix_timestamp()?);
-        user.update(&transaction).await?;
-        email_verification_token::Entity::delete_by_id(user_id)
-            .exec(&transaction)
-            .await?;
-        transaction.commit().await?;
+        user.update(&self.database).await?;
         Ok(true)
     }
 }
@@ -254,7 +215,7 @@ impl AuthnBackend for AuthBackend {
                 |user| user.password_hash.as_str(),
             )
             .to_owned();
-        let password_matches = verify_password(credentials.password, hash).await?;
+        let password_matches = self.passwords.verify(&credentials.password, &hash).await?;
         Ok(user.filter(|_| password_matches))
     }
 
@@ -265,85 +226,103 @@ impl AuthnBackend for AuthBackend {
     }
 }
 
-pub enum CreateUser {
-    Created(User),
-    EmailAlreadyExists,
-}
-
 #[derive(Debug, Error)]
 pub enum AuthError {
     #[error("database operation failed")]
     Database(#[from] DbErr),
-    #[error("password operation failed")]
-    Password,
-    #[error("password worker failed")]
-    PasswordWorker(#[from] JoinError),
+    #[error(transparent)]
+    Password(#[from] PasswordHashError),
+    #[error(transparent)]
+    PasswordReset(#[from] PasswordResetError<DbErr>),
+    #[error(transparent)]
+    CreateNewUser(#[from] CreateNewUserError),
+    #[error(transparent)]
+    EmailVerification(#[from] EmailVerificationError),
     #[error("system clock is before the Unix epoch")]
     Clock(#[from] std::time::SystemTimeError),
-    #[error("login rate limit could not be configured")]
-    RateLimitConfiguration,
 }
 
-async fn hash_password(password: &str) -> Result<String, AuthError> {
-    let password = password.to_owned();
-    tokio::task::spawn_blocking(move || {
-        Argon2::default()
-            .hash_password(password.as_bytes())
-            .map(|hash| hash.to_string())
-            .map_err(|_| AuthError::Password)
-    })
-    .await?
-}
+#[derive(Clone, Debug)]
+struct AuthRepository(DatabaseConnection);
 
-async fn verify_password(password: String, password_hash: String) -> Result<bool, AuthError> {
-    tokio::task::spawn_blocking(move || {
-        let hash = PasswordHash::new(&password_hash).map_err(|_| AuthError::Password)?;
-        Ok(Argon2::default()
-            .verify_password(password.as_bytes(), &hash)
-            .is_ok())
-    })
-    .await?
+impl PasswordResetRepository for AuthRepository {
+    type Error = DbErr;
+
+    async fn user_exists(&self, email: &str) -> Result<bool, Self::Error> {
+        Ok(user::Entity::find()
+            .filter(user::Column::Email.eq(email))
+            .one(&self.0)
+            .await?
+            .is_some())
+    }
+
+    async fn token(&self, email: &str) -> Result<Option<StoredPasswordResetToken>, Self::Error> {
+        Ok(password_reset_token::Entity::find_by_id(email)
+            .one(&self.0)
+            .await?
+            .map(|token| StoredPasswordResetToken {
+                digest: token.token_hash,
+                created_at: token.created_at,
+            }))
+    }
+
+    async fn replace_token(
+        &self,
+        email: &str,
+        token: StoredPasswordResetToken,
+    ) -> Result<(), Self::Error> {
+        password_reset_token::Entity::insert(password_reset_token::ActiveModel {
+            email: Set(email.to_owned()),
+            token_hash: Set(token.digest),
+            created_at: Set(token.created_at),
+        })
+        .on_conflict(
+            OnConflict::column(password_reset_token::Column::Email)
+                .update_columns([
+                    password_reset_token::Column::TokenHash,
+                    password_reset_token::Column::CreatedAt,
+                ])
+                .to_owned(),
+        )
+        .exec(&self.0)
+        .await?;
+        Ok(())
+    }
+
+    async fn consume_token(&self, reset: ConsumedPasswordReset<'_>) -> Result<bool, Self::Error> {
+        let transaction = self.0.begin().await?;
+        let Some(token) = password_reset_token::Entity::find_by_id(reset.email)
+            .one(&transaction)
+            .await?
+        else {
+            return Ok(false);
+        };
+        if token.token_hash != reset.expected_digest {
+            return Ok(false);
+        }
+        let Some(user) = user::Entity::find()
+            .filter(user::Column::Email.eq(reset.email))
+            .one(&transaction)
+            .await?
+        else {
+            return Ok(false);
+        };
+        let mut user: user::ActiveModel = user.into();
+        user.password_hash = Set(reset.password_hash.to_owned());
+        user.updated_at = Set(reset.updated_at);
+        user.update(&transaction).await?;
+        password_reset_token::Entity::delete_by_id(reset.email)
+            .exec(&transaction)
+            .await?;
+        transaction.commit().await?;
+        Ok(true)
+    }
 }
 
 fn normalize_email(email: &str) -> String {
     email.to_lowercase()
 }
 
-fn token_digest(token: &str) -> String {
-    format!("{:x}", Sha256::digest(token.as_bytes()))
-}
-
 fn unix_timestamp() -> Result<i64, std::time::SystemTimeError> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64)
-}
-
-#[derive(Clone, Debug)]
-struct LoginAttempts {
-    quota: Quota,
-    entries: Arc<Mutex<HashMap<String, Arc<DefaultDirectRateLimiter>>>>,
-}
-
-impl LoginAttempts {
-    fn new() -> Result<Self, AuthError> {
-        let attempts = NonZeroU32::new(5).ok_or(AuthError::RateLimitConfiguration)?;
-        Ok(Self {
-            quota: Quota::per_minute(attempts),
-            entries: Arc::new(Mutex::new(HashMap::new())),
-        })
-    }
-
-    async fn check(&self, key: &str) -> bool {
-        let limiter = self
-            .entries
-            .lock()
-            .await
-            .entry(key.to_owned())
-            .or_insert_with(|| Arc::new(RateLimiter::direct(self.quota)))
-            .clone();
-        limiter.check().is_err()
-    }
-
-    async fn clear(&self, key: &str) {
-        self.entries.lock().await.remove(key);
-    }
 }

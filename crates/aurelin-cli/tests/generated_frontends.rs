@@ -1,5 +1,6 @@
 use std::{
     error::Error,
+    fs,
     path::{Path, PathBuf},
     process::Command,
 };
@@ -24,6 +25,9 @@ fn react_and_vue_projects_compile_and_test_their_inertia_boundaries() -> Result<
             .args(["--frontend", frontend])
             .output()?;
         assert!(create.status.success(), "{}", String::from_utf8_lossy(&create.stderr));
+        let environment = fs::read_to_string(destination.join(".env"))?;
+        assert!(environment.contains("APP_KEY="));
+        assert!(!environment.contains("change-this-to-a-long-random-secret"));
 
         for arguments in [
             vec!["fmt", "--all", "--", "--check"],

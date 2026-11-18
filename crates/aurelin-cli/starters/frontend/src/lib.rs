@@ -7,6 +7,7 @@ use std::{
 use aurelin_framework::configuration::{ServerConfig, environment};
 use tokio::net::TcpListener;
 
+mod actions;
 mod auth;
 pub mod bootstrap;
 mod database;
@@ -32,11 +33,18 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
         .map(String::as_str)
         .unwrap_or("false")
         .parse::<bool>()?;
+    let application_key = environment.get("APP_KEY").ok_or("APP_KEY must be set")?;
     let frontend = frontend::Frontend::new();
     let _dev_server = frontend.start_dev_server();
     let listener = TcpListener::bind((config.host.as_str(), config.port)).await?;
     tracing::info!(address = %listener.local_addr()?, "Aurelin listening");
-    let application = bootstrap::application(frontend, database_url, secure_cookie).await?;
+    let application = bootstrap::application(
+        frontend,
+        database_url,
+        secure_cookie,
+        application_key.as_bytes(),
+    )
+    .await?;
     aurelin_framework::axum::serve(
         listener,
         application.into_make_service_with_connect_info::<std::net::SocketAddr>(),

@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use aurelin_fortify::LoginRateLimiter;
 use aurelin_framework::{
     axum::{
         Json, Router,
@@ -15,7 +16,8 @@ use serde::{Deserialize, Serialize};
 use validator::{Validate, ValidationErrors as ValidatorInputErrors};
 
 use crate::{
-    auth::{AuthSession, CreateUser, Credentials, PublicUser},
+    actions::CreateUser,
+    auth::{AuthSession, Credentials, PublicUser},
     frontend::Frontend,
     frontend_config::{DASHBOARD_COMPONENT, LOGIN_COMPONENT, REGISTER_COMPONENT},
     routes::{
@@ -135,7 +137,7 @@ async fn store_login(
         }
         Err(ValidationRejection::Inner(error)) => return Ok(error.into_response()),
     };
-    let key = format!("{}|{}", input.email.to_lowercase(), address.ip());
+    let key = LoginRateLimiter::key(&input.email, address.ip());
     if auth.backend.too_many_login_attempts(&key).await {
         return redirect_with_error(
             &auth,
@@ -214,12 +216,9 @@ async fn store_registration(
             .await;
         }
     };
-    let token = auth
-        .backend
-        .create_email_verification_token(user.id)
-        .await?;
+    let verification_url = auth.backend.email_verification_url(&user)?;
     tracing::info!(
-        verification_url = %format!("/verify-email/{}/{token}", user.id),
+        %verification_url,
         "email verification notification"
     );
     auth.login(&user).await?;
@@ -241,7 +240,7 @@ async fn dashboard(
         return Ok(request.redirect(Inertia::redirect("/login"))?);
     };
     if user.email_verified_at.is_none() {
-        return Ok(request.redirect(Inertia::redirect("/verify-email"))?);
+        return Ok(request.redirect(Inertia::redirect("/email/verify"))?);
     }
     let csrf_token = get_or_create_token(&auth.session)
         .await

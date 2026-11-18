@@ -33,36 +33,10 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        manager
-            .create_table(
-                Table::create()
-                    .table(EmailVerificationTokens::Table)
-                    .if_not_exists()
-                    .col(big_integer(EmailVerificationTokens::UserId).primary_key())
-                    .col(string(EmailVerificationTokens::TokenHash))
-                    .col(big_integer(EmailVerificationTokens::CreatedAt))
-                    .foreign_key(
-                        ForeignKey::create()
-                            .from(
-                                EmailVerificationTokens::Table,
-                                EmailVerificationTokens::UserId,
-                            )
-                            .to(Users::Table, Users::Id)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
-                    .to_owned(),
-            )
-            .await
+        Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_table(
-                Table::drop()
-                    .table(EmailVerificationTokens::Table)
-                    .to_owned(),
-            )
-            .await?;
         manager
             .drop_table(Table::drop().table(PasswordResetTokens::Table).to_owned())
             .await?;
@@ -89,14 +63,6 @@ enum Users {
 enum PasswordResetTokens {
     Table,
     Email,
-    TokenHash,
-    CreatedAt,
-}
-
-#[derive(DeriveIden)]
-enum EmailVerificationTokens {
-    Table,
-    UserId,
     TokenHash,
     CreatedAt,
 }

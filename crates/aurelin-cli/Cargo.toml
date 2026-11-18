@@ -12,6 +12,7 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 include_dir = "0.7"
+rand = "0.9"
 toml_edit = "0.25"
 
 [lints]

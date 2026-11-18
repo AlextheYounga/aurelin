@@ -3,6 +3,7 @@ use std::{fs, path::Path, process::Command};
 use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
 use include_dir::{Dir, include_dir};
+use rand::{Rng, distr::Alphanumeric};
 use toml_edit::{DocumentMut, InlineTable, value};
 
 static STARTER: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/starters/base");
@@ -52,6 +53,15 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
     let mut aurelin = InlineTable::new();
     aurelin.insert("path", framework.into());
     dependencies["aurelin-framework"] = value(aurelin);
+    if frontend.is_some() {
+        let fortify_path = Path::new(framework)
+            .parent()
+            .context("framework crate must have a parent directory")?
+            .join("aurelin-fortify");
+        let mut fortify = InlineTable::new();
+        fortify.insert("path", fortify_path.to_str().context("aurelin-fortify path must be valid Unicode")?.into());
+        dependencies["aurelin-fortify"] = value(fortify);
+    }
     let mut tokio = InlineTable::new();
     tokio.insert("version", "1".into());
     tokio.insert(
@@ -63,18 +73,15 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
     dependencies["tracing-subscriber"] = value("0.3");
     dependencies["serde_json"] = value("1");
     if frontend.is_some() {
-        dependencies["argon2"] = value("0.6");
         dependencies["axum-login"] = value("0.18");
         dependencies["axum-tower-sessions-csrf"] = value("=0.1.1");
         dependencies["axum-valid"] = value("0.25");
-        dependencies["governor"] = value("0.10");
         dependencies["serde"] = value({
             let mut dependency = InlineTable::new();
             dependency.insert("version", "1".into());
             dependency.insert("features", ["derive"].into_iter().collect::<toml_edit::Array>().into());
             dependency
         });
-        dependencies["sha2"] = value("0.10");
         dependencies["sea-orm"] = value({
             let mut dependency = InlineTable::new();
             dependency.insert("version", "1.1".into());
@@ -142,6 +149,11 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
         let contents = fs::read_to_string(&source)?;
         fs::write(source, contents.replace("__AURELIN_CRATE__", &crate_name))?;
     }
-    fs::copy(path.join(".env.example"), path.join(".env"))?;
+    let mut environment = fs::read_to_string(path.join(".env.example"))?;
+    if frontend.is_some() {
+        let application_key: String = rand::rng().sample_iter(Alphanumeric).take(64).map(char::from).collect();
+        environment = environment.replace("change-this-to-a-long-random-secret", &application_key);
+    }
+    fs::write(path.join(".env"), environment)?;
     Ok(())
 }

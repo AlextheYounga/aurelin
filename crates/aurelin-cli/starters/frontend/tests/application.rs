@@ -13,7 +13,7 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn initial_visit_contains_the_inertia_page_and_vite_entry() -> Result<(), Box<dyn Error>> {
-    let response = application(Frontend::new(), "sqlite::memory:", false)
+    let response = application(Frontend::new(), "sqlite::memory:", false, b"test-key")
         .await?
         .oneshot(Request::builder().uri("/").body(Body::empty())?)
         .await?;
@@ -29,7 +29,7 @@ async fn initial_visit_contains_the_inertia_page_and_vite_entry() -> Result<(), 
 async fn inertia_visit_returns_json_for_the_same_component() -> Result<(), Box<dyn Error>> {
     let frontend = Frontend::new();
     let version = frontend.version().to_owned();
-    let response = application(frontend, "sqlite::memory:", false)
+    let response = application(frontend, "sqlite::memory:", false, b"test-key")
         .await?
         .oneshot(
             Request::builder()

@@ -5,11 +5,17 @@ edition = "2024"
 
 [dependencies]
 axum = "0.8"
+bcrypt = "0.17"
 config = { version = "0.15", default-features = false }
 dotenvy = "0.15"
+hmac = "0.12"
 inertia_rs = { version = "0.4", default-features = false, features = ["axum"] }
+rand = "0.9"
 serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
 thiserror = "2"
+tokio = { version = "1", features = ["rt", "sync", "time"] }
+tower-sessions = "0.14"
 
 [lints]
 workspace = true

@@ -11,7 +11,7 @@ use tower::ServiceExt;
 #[tokio::test]
 async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
 -> Result<(), Box<dyn Error>> {
-    let app = application(Frontend::new(), "sqlite::memory:", false).await?;
+    let app = application(Frontend::new(), "sqlite::memory:", false, b"test-key").await?;
     let register_page = app
         .clone()
         .oneshot(request(Method::GET, "/register", None, None, None)?)
@@ -60,13 +60,13 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
         )?)
         .await?;
     assert_eq!(dashboard.status(), StatusCode::FOUND);
-    assert_eq!(dashboard.headers()[header::LOCATION], "/verify-email");
+    assert_eq!(dashboard.headers()[header::LOCATION], "/email/verify");
 
     let verification = app
         .clone()
         .oneshot(request(
             Method::GET,
-            "/verify-email",
+            "/email/verify",
             Some(&authenticated_cookie),
             None,
             None,

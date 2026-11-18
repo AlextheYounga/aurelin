@@ -1,0 +1,14 @@
+[package]
+name = "aurelin-fortify"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aurelin-framework = { path = "../aurelin-framework" }
+thiserror = "2"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

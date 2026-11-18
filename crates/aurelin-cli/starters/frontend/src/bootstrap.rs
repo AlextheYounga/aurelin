@@ -4,7 +4,6 @@ use aurelin_framework::{
 };
 use axum_login::AuthManagerLayerBuilder;
 use axum_tower_sessions_csrf::CsrfMiddleware;
-use tower_sessions::SessionManagerLayer;
 use tower_sessions_sqlx_store::SqliteStore;
 
 use crate::{auth::AuthBackend, frontend::Frontend};
@@ -14,16 +13,22 @@ pub async fn application(
     frontend: Frontend,
     database_url: &str,
     secure_cookie: bool,
+    application_key: &[u8],
 ) -> Result<Router, Box<dyn std::error::Error>> {
     let version = frontend.version();
     let database = crate::database::connect(database_url).await?;
     let session_store = SqliteStore::new(database.get_sqlite_connection_pool().clone());
     session_store.migrate().await?;
-    let session_layer = SessionManagerLayer::new(session_store)
-        .with_name("aurelin_session")
-        .with_secure(secure_cookie);
-    let auth_layer =
-        AuthManagerLayerBuilder::new(AuthBackend::new(database).await?, session_layer).build();
+    let session_layer = aurelin_framework::session::web_session_layer(
+        session_store,
+        "aurelin_session",
+        secure_cookie,
+    );
+    let auth_layer = AuthManagerLayerBuilder::new(
+        AuthBackend::new(database, application_key).await?,
+        session_layer,
+    )
+    .build();
 
     Ok(Router::new()
         .merge(crate::routes::http::routes())
