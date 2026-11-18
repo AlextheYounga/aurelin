@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>PHP and Rust: What the runtime changes</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18251f;
+      --muted: #52645a;
+      --paper: #f5f7f3;
+      --card: #fff;
+      --line: #d7e0d8;
+      --php: #7351a6;
+      --rust: #b64b2a;
+      --green: #286d4b;
+      --soft-green: #e8f3eb;
+      --soft-purple: #f0ebf7;
+      --soft-rust: #fbede7;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); line-height: 1.55; }
+    main { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 64px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { max-width: 760px; margin-bottom: 12px; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.08; letter-spacing: -0.04em; }
+    h2 { font-size: 1.55rem; letter-spacing: -0.02em; }
+    h3 { margin-bottom: 8px; font-size: 1.05rem; }
+    .eyebrow { color: var(--green); font-size: .76rem; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+    .lede { max-width: 760px; color: var(--muted); font-size: 1.12rem; }
+    .note { padding: 14px 18px; border-left: 4px solid var(--green); border-radius: 4px 12px 12px 4px; background: var(--soft-green); }
+    section { margin-top: 44px; }
+    .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .lane { overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--card); }
+    .lane header { padding: 18px 22px; }
+    .lane.php header { background: var(--soft-purple); }
+    .lane.rust header { background: var(--soft-rust); }
+    .lane header h3 { margin: 0; font-size: 1.25rem; }
+    .lane header p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
+    .steps { display: grid; gap: 10px; padding: 18px; }
+    .step { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+    .number { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 50%; background: #edf1ed; font-size: .82rem; font-weight: 800; }
+    .php .number { color: var(--php); background: #eee7f6; }
+    .rust .number { color: var(--rust); background: #fae7de; }
+    .step p { margin: 0; font-size: .93rem; }
+    .step strong { display: block; margin-bottom: 2px; }
+    .subtle { color: var(--muted); }
+    .timeline { display: grid; grid-template-columns: 145px 1fr; gap: 12px; align-items: center; margin: 18px 0; }
+    .timeline-label { font-size: .88rem; font-weight: 700; }
+    .track { position: relative; min-height: 40px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    .bar { display: flex; min-height: 38px; align-items: center; padding: 0 12px; border-radius: 9px; color: white; font-size: .8rem; font-weight: 700; }
+    .bar.wait { width: 100%; background: var(--php); }
+    .bar.concurrent { width: 52%; background: var(--rust); }
+    .other { position: absolute; top: 6px; right: 8px; color: var(--muted); font-size: .74rem; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+    .card p { margin-bottom: 0; color: var(--muted); font-size: .93rem; }
+    .choice { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: stretch; margin-top: 18px; }
+    .choice article { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+    .choice .arrow { align-self: center; color: var(--green); font-size: 1.7rem; font-weight: 800; }
+    .choice p { margin: 0; color: var(--muted); }
+    .rule { margin-top: 18px; padding: 18px 20px; border: 1px solid #bdd5c3; border-radius: 14px; background: var(--soft-green); font-size: 1.08rem; }
+    footer { margin-top: 40px; padding-top: 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: .86rem; }
+    a { color: #185d40; }
+
+    @media (max-width: 700px) {
+      main { padding-top: 32px; }
+      .lanes, .cards { grid-template-columns: 1fr; }
+      .choice { grid-template-columns: 1fr; }
+      .choice .arrow { justify-self: center; transform: rotate(90deg); }
+      .timeline { grid-template-columns: 1fr; gap: 5px; }
+    }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Kiln · runtime mental model</p>
+    <h1>What changes when requests run concurrently?</h1>
+    <p class="lede">Laravel capabilities are the things developers need. PHP’s common deployment model influences how Laravel delivers them. Rust changes some of that machinery—but it does not make durability, security, or slow work disappear.</p>
+    <p class="note"><strong>Important distinction:</strong> “PHP usually handles a request in a worker” describes the common PHP-FPM model, not an absolute PHP limitation. Laravel Octane can also run long-lived workers.</p>
+
+    <section aria-labelledby="request-model">
+      <h2 id="request-model">Two common request models</h2>
+      <div class="lanes">
+        <article class="lane php">
+          <header><h3>Traditional PHP-FPM + Laravel</h3><p>Common model · one request occupies a worker while it runs</p></header>
+          <div class="steps">
+            <div class="step"><span class="number">1</span><p><strong>Worker receives request</strong>Laravel handles the request in that worker.</p></div>
+            <div class="step"><span class="number">2</span><p><strong>Code waits on I/O</strong>Database or HTTP calls commonly block that worker until they return.</p></div>
+            <div class="step"><span class="number">3</span><p><strong>Worker returns to pool</strong>Another request needs another available worker. Process reuse depends on deployment/runtime.</p></div>
+          </div>
+        </article>
+        <article class="lane rust">
+          <header><h3>Typical async Rust server</h3><p>Long-lived process · tasks yield during supported async I/O</p></header>
+          <div class="steps">
+            <div class="step"><span class="number">1</span><p><strong>Server stays running</strong>Routes, configuration, and shared clients can be initialized at startup.</p></div>
+            <div class="step"><span class="number">2</span><p><strong>Task awaits I/O</strong>The executor can run other ready tasks while this task waits.</p></div>
+            <div class="step"><span class="number">3</span><p><strong>Shared resources need limits</strong>Pools and semaphores bound database, CPU, and external-service load.</p></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="wait-example">
+      <h2 id="wait-example">Async frees capacity; it doesn’t make the operation instant</h2>
+      <p class="subtle">Imagine one request spends 2 seconds waiting for an external API. The timeline below shows that same wait.</p>
+      <div class="timeline"><div class="timeline-label">Blocking worker</div><div class="track"><div class="bar wait">Request A is waiting (2 seconds)</div></div></div>
+      <div class="timeline"><div class="timeline-label">Async task</div><div class="track"><div class="bar concurrent">Request A waits</div><span class="other">server can run B, C, D…</span></div></div>
+      <p class="subtle">If Request A must include the API result, the user still waits for it. The benefit is that other requests can make progress meanwhile.</p>
+    </section>
+
+    <section aria-labelledby="rethink">
+      <h2 id="rethink">What Kiln can simplify or rethink</h2>
+      <div class="cards">
+        <article class="card"><h3>Initialize once</h3><p>Load and validate configuration, build routes, and create connection pools when the server starts—not for every request. This is an opportunity, not a PHP requirement.</p></article>
+        <article class="card"><h3>Pass state explicitly</h3><p>Rust types can make handler dependencies visible. A large runtime container or reflection-driven discovery may be unnecessary if explicit state and registration stay ergonomic.</p></article>
+        <article class="card"><h3>Keep quick I/O inline</h3><p>Async work that belongs to the response can run without occupying a whole worker thread. Still apply timeouts and resource limits where needed.</p></article>
+        <article class="card"><h3>Use pools, not per-request clients</h3><p>Long-lived database and HTTP clients reuse connections. Pool limits and transaction boundaries still matter under concurrency.</p></article>
+        <article class="card"><h3>Bound expensive work</h3><p>Password hashing and other CPU-heavy tasks can consume executor resources. Run them off the async path and limit parallelism.</p></article>
+        <article class="card"><h3>Keep request state isolated</h3><p>A long-lived process serves many users. Don’t let one request’s mutable data leak into another; use request-scoped state and safe shared-state patterns.</p></article>
+      </div>
+    </section>
+
+    <section aria-labelledby="queue">
+      <h2 id="queue">Queue or inline? Decide by guarantees, not language</h2>
+      <div class="choice">
+        <article><h3>Inline async work</h3><p>Use when the result is part of the response, the work is bounded, and it’s acceptable for the request to fail if the operation fails.</p></article>
+        <div class="arrow" aria-hidden="true">→</div>
+        <article><h3>Durable database queue</h3><p>Use when work must survive a process restart, retry later, run on a schedule, or complete independently of the response. Redis is not inherently required.</p></article>
+      </div>
+      <p class="rule"><strong>Async task ≠ durable job.</strong> A spawned in-memory task can be lost if the process stops. A queue persists work so a worker can pick it up later.</p>
+    </section>
+
+    <section aria-labelledby="still-needed">
+      <h2 id="still-needed">Rust concurrency does not replace these capabilities</h2>
+      <div class="cards">
+        <article class="card"><h3>Authentication & authorization</h3><p>Concurrency doesn’t decide who a user is or what they may do.</p></article>
+        <article class="card"><h3>Validation & CSRF protection</h3><p>More requests at once do not make untrusted input safe.</p></article>
+        <article class="card"><h3>Transactions & durable work</h3><p>Async I/O does not make a multi-step update atomic or survive a crash.</p></article>
+      </div>
+    </section>
+
+    <footer>
+      <p><strong>Takeaway:</strong> preserve Laravel’s user-facing behavior; don’t copy runtime-specific machinery without a reason. Async only helps when the libraries used are actually async—blocking code can still stall executor threads.</p>
+      <p>Related project direction: <a href="../CONTEXT.md">Kiln project context</a> · <a href="crate-mapping.md">Crate mapping</a></p>
+    </footer>
+  </main>
+</body>
+</html>
