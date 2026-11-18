@@ -1,9 +1,9 @@
 ---
 name: follow-crate-mapping
-description: Enforce Kiln's researched crate choices when selecting dependencies, designing architecture, implementing Laravel-equivalent capabilities, changing generated starters, or reviewing whether code uses the intended Rust stack. Use whenever work adds, replaces, bypasses, or directly uses a dependency covered by docs/crate-mapping.md.
+description: Enforce Aurelin's researched crate choices when selecting dependencies, designing architecture, implementing Laravel-equivalent capabilities, changing generated starters, or reviewing whether code uses the intended Rust stack. Use whenever work adds, replaces, bypasses, or directly uses a dependency covered by docs/crate-mapping.md.
 ---
 
-# Follow Kiln's Crate Mapping
+# Follow Aurelin's Crate Mapping
 
 ## Start with the project decisions
 
@@ -22,7 +22,7 @@ description: Enforce Kiln's researched crate choices when selecting dependencies
 
 ## Verify before adoption
 
-- Confirm the current crate version, feature flags, MSRV, license, maintenance status, and compatibility with the rest of Kiln's stack.
+- Confirm the current crate version, feature flags, MSRV, license, maintenance status, and compatibility with the rest of Aurelin's stack.
 - Verify actual APIs and runtime behavior from authoritative documentation or source.
 - Treat the mapping as a researched default, not proof that an integration works.
 

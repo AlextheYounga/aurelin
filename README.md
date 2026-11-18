@@ -1,6 +1,6 @@
-# Kiln
+# Aurelin
 
-Kiln is an early Rust framework ecosystem modeled on Laravel 13. It combines
+Aurelin is an early Rust framework ecosystem modeled on Laravel 13. It combines
 existing Rust crates and frontend packages into a recognizable application
 workflow rather than reimplementing their underlying functionality.
 
@@ -30,9 +30,9 @@ status and references.
 Until the crates are published, pass the local framework path explicitly:
 
 ```sh
-cargo run -p kiln-cli -- new /tmp/my-kiln-app \
-  --framework-path "$PWD/crates/kiln-framework"
-cd /tmp/my-kiln-app
+cargo run -p aurelin-cli -- new /tmp/my-aurelin-app \
+  --framework-path "$PWD/crates/aurelin-framework"
+cd /tmp/my-aurelin-app
 cargo run
 ```
 
@@ -42,10 +42,10 @@ it does not imply that a finished Laravel-equivalent starter kit exists.
 To exercise one of the frontend foundations:
 
 ```sh
-cargo run -p kiln-cli -- new /tmp/my-kiln-react-app \
-  --framework-path "$PWD/crates/kiln-framework" \
+cargo run -p aurelin-cli -- new /tmp/my-aurelin-react-app \
+  --framework-path "$PWD/crates/aurelin-framework" \
   --frontend react
-cd /tmp/my-kiln-react-app
+cd /tmp/my-aurelin-react-app
 npm install
 cargo run
 ```
@@ -57,10 +57,10 @@ authentication starters.
 Generate shell completion output with, for example:
 
 ```sh
-cargo run -p kiln-cli -- completions bash
+cargo run -p aurelin-cli -- completions bash
 ```
 
-## Develop Kiln
+## Develop Aurelin
 
 ```sh
 cargo fmt --all -- --check

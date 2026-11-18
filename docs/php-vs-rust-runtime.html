@@ -78,7 +78,7 @@
 </head>
 <body>
   <main>
-    <p class="eyebrow">Kiln · runtime mental model</p>
+    <p class="eyebrow">Aurelin · runtime mental model</p>
     <h1>What changes when requests run concurrently?</h1>
     <p class="lede">Laravel capabilities are the things developers need. PHP’s common deployment model influences how Laravel delivers them. Rust changes some of that machinery—but it does not make durability, security, or slow work disappear.</p>
     <p class="note"><strong>Important distinction:</strong> “PHP usually handles a request in a worker” describes the common PHP-FPM model, not an absolute PHP limitation. Laravel Octane can also run long-lived workers.</p>
@@ -114,7 +114,7 @@
     </section>
 
     <section aria-labelledby="rethink">
-      <h2 id="rethink">What Kiln can simplify or rethink</h2>
+      <h2 id="rethink">What Aurelin can simplify or rethink</h2>
       <div class="cards">
         <article class="card"><h3>Initialize once</h3><p>Load and validate configuration, build routes, and create connection pools when the server starts—not for every request. This is an opportunity, not a PHP requirement.</p></article>
         <article class="card"><h3>Pass state explicitly</h3><p>Rust types can make handler dependencies visible. A large runtime container or reflection-driven discovery may be unnecessary if explicit state and registration stay ergonomic.</p></article>
@@ -146,7 +146,7 @@
 
     <footer>
       <p><strong>Takeaway:</strong> preserve Laravel’s user-facing behavior; don’t copy runtime-specific machinery without a reason. Async only helps when the libraries used are actually async—blocking code can still stall executor threads.</p>
-      <p>Related project direction: <a href="../CONTEXT.md">Kiln project context</a> · <a href="crate-mapping.md">Crate mapping</a></p>
+      <p>Related project direction: <a href="../CONTEXT.md">Aurelin project context</a> · <a href="crate-mapping.md">Crate mapping</a></p>
     </footer>
   </main>
 </body>

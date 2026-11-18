@@ -2,16 +2,16 @@
 
 ## Repository layout
 
-Kiln is a Rust framework ecosystem modeled on Laravel. Independently usable
+Aurelin is a Rust framework ecosystem modeled on Laravel. Independently usable
 packages live under `crates/` and may eventually be published separately.
 
 ```text
-kiln/
+aurelin/
 ├── Cargo.toml
 ├── CONTEXT.md
 ├── crates/
-│   ├── kiln-framework/       # Runtime integration and conventions
-│   └── kiln-cli/             # Project generator and embedded starters
+│   ├── aurelin-framework/       # Runtime integration and conventions
+│   └── aurelin-cli/             # Project generator and embedded starters
 │       └── starters/base/
 └── laravel -> ...            # Local Laravel source reference, not a dependency
 ```
@@ -20,10 +20,10 @@ kiln/
 
 ### Application creation
 
-`kiln new <path> --framework-path <path>` delegates package creation and name
-validation to `cargo new`, then installs Kiln's starter files. It refuses an
+`aurelin new <path> --framework-path <path>` delegates package creation and name
+validation to `cargo new`, then installs Aurelin's starter files. It refuses an
 existing destination rather than adopting or overwriting it. The framework
-path is temporary until `kiln-framework` is published.
+path is temporary until `aurelin-framework` is published.
 
 The generated application separates its concerns in the same broad order as a
 Laravel application:
@@ -35,7 +35,7 @@ Laravel application:
 
 This is a Rust translation, not a copy of PHP's runtime or service container.
 Axum owns routing, handlers, middleware composition, and HTTP serving. Tokio
-owns the runtime, listener, and graceful Ctrl+C shutdown. Kiln does not wrap
+owns the runtime, listener, and graceful Ctrl+C shutdown. Aurelin does not wrap
 those APIs where a wrapper adds no behavior.
 
 ### Configuration
@@ -62,13 +62,13 @@ produce a failing process status. The starter includes:
   is requested;
 - Axum's native 404 and method-not-allowed behavior.
 
-The health route currently establishes only the default healthy response. Kiln
+The health route currently establishes only the default healthy response. Aurelin
 does not yet have Laravel's event dispatcher, so it cannot yet reproduce the
 `DiagnosingHealth` hook or its failure path.
 
 ### Inertia protocol
 
-`kiln-framework` re-exports `inertia_rs` 0.4 with its Axum adapter. Integration
+`aurelin-framework` re-exports `inertia_rs` 0.4 with its Axum adapter. Integration
 tests exercise Inertia 3 initial HTML visits, JSON visits, script-safe page
 data, asset versions, and stale-version reload responses through a real Axum
 router.
@@ -83,7 +83,7 @@ dependency for the workspace's current Rust 1.97 toolchain.
 
 ### Vue and React frontend foundations
 
-`kiln new` accepts `--frontend react` or `--frontend vue`. Both variants use
+`aurelin new` accepts `--frontend react` or `--frontend vue`. Both variants use
 the same Axum routes and Inertia responses, and differ only in their Vite
 plugin, entry point, and page component. The versions verified by the starter
 are Inertia client/Vite plugin 3.11, React 19, Vue 3.5, TypeScript 5.9, and Vite
@@ -91,7 +91,7 @@ are Inertia client/Vite plugin 3.11, React 19, Vue 3.5, TypeScript 5.9, and Vite
 
 `vite-rs` 0.3 and its Axum 0.8 adapter provide the mapped integration: a
 managed Vite development server, Tower asset service, release builds, and
-embedded production output. Kiln supplies the dynamic Inertia root document,
+embedded production output. Aurelin supplies the dynamic Inertia root document,
 React refresh preamble in development, and asset-version wiring. A generated
 app starts Vite as a managed child in debug builds and terminates it when the
 backend exits. During `cargo build --release`, `vite-rs` runs Vite and embeds
@@ -142,7 +142,7 @@ production `src/` trees contain no inline test modules or test-only seams.
 
 Add dependencies and framework behavior only for the capability currently
 being implemented. Verify Laravel behavior and the selected library first.
-Prefer direct use of existing Rust and frontend APIs; add Kiln code only for a
+Prefer direct use of existing Rust and frontend APIs; add Aurelin code only for a
 real integration or convention gap. A selected dependency is not evidence of
 Laravel parity.
 

@@ -1,6 +1,6 @@
 ---
 name: translate-laravel
-description: Translate Laravel features into Kiln faithfully and idiomatically. Use whenever implementing, changing, reviewing, or planning Laravel-equivalent behavior, conventions, generated application code, starter-kit flows, framework APIs, validation, routing, authentication, persistence, queues, mail, events, middleware, configuration, or developer tooling. Requires inspecting the applicable Laravel documentation, source, tests, and official starter implementation before designing Rust code, then reusing Kiln's mapped crates rather than reinventing upstream functionality.
+description: Translate Laravel features into Aurelin faithfully and idiomatically. Use whenever implementing, changing, reviewing, or planning Laravel-equivalent behavior, conventions, generated application code, starter-kit flows, framework APIs, validation, routing, authentication, persistence, queues, mail, events, middleware, configuration, or developer tooling. Requires inspecting the applicable Laravel documentation, source, tests, and official starter implementation before designing Rust code, then reusing Aurelin's mapped crates rather than reinventing upstream functionality.
 ---
 
 # Translate Laravel
@@ -11,7 +11,7 @@ Treat Laravel as the behavioral reference and Rust as the implementation languag
 
 Before designing or writing feature code:
 
-1. Read the relevant sections of `CONTEXT.md` and identify the Laravel version Kiln targets.
+1. Read the relevant sections of `CONTEXT.md` and identify the Laravel version Aurelin targets.
 2. Locate the authoritative Laravel implementation for the requested capability. Inspect, as applicable:
    - Laravel documentation;
    - framework or first-party package source;
@@ -41,10 +41,10 @@ Use this as the behavioral contract. Do not turn the research into a speculative
 
 ## Reuse before building
 
-1. Search Kiln for an existing implementation or convention.
+1. Search Aurelin for an existing implementation or convention.
 2. Read `docs/crate-mapping.md` and load the `follow-crate-mapping` skill for mapped capabilities.
 3. Verify the selected crate's real API, version compatibility, features, maintenance, license, and behavior from authoritative documentation or source.
-4. Identify the exact gap between the verified Laravel contract and what Rust, Kiln, and the selected crate already provide.
+4. Identify the exact gap between the verified Laravel contract and what Rust, Aurelin, and the selected crate already provide.
 5. Write only the integration, adaptation, conventions, or starter code needed to close that gap.
 
 Do not recreate an ORM, validator, router, container, event system, queue, mailer, session layer, asset pipeline, or other subsystem when the mapped stack already provides it. Do not wrap a crate merely to make its API look more like PHP when direct use is clear and coherent.
@@ -71,16 +71,16 @@ Do not mechanically port classes, facades, macros, traits, service providers, ac
 - Name concepts using Laravel terminology when the concept remains the same; use Rust terminology where the implementation mechanism differs.
 - Preserve default behavior before adding customization.
 - Keep optional Laravel features optional.
-- Explain unavoidable differences caused by Rust, the selected crates, or an explicit Kiln decision.
+- Explain unavoidable differences caused by Rust, the selected crates, or an explicit Aurelin decision.
 - Remove superseded implementations and compatibility shims once the translation replaces them.
 
 Stop and report the gap rather than claiming equivalence when a required behavior cannot yet be implemented faithfully.
 
 ## Verify against the reference
 
-Derive focused tests from Laravel's observable scenarios and upstream tests. Cover the relevant successful flow and critical failure or invariant boundaries through Kiln's real public boundary.
+Derive focused tests from Laravel's observable scenarios and upstream tests. Cover the relevant successful flow and critical failure or invariant boundaries through Aurelin's real public boundary.
 
-Do not port assertions about Laravel internals or duplicate tests belonging entirely to an upstream Rust crate. Test Kiln's translation, integration, defaults, generated output, and user-visible workflow.
+Do not port assertions about Laravel internals or duplicate tests belonging entirely to an upstream Rust crate. Test Aurelin's translation, integration, defaults, generated output, and user-visible workflow.
 
 Before completion:
 

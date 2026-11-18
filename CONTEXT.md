@@ -1,16 +1,16 @@
-# Kiln — Project Context
+# Aurelin — Project Context
 
 ## Purpose
 
-Kiln is a Rust web framework ecosystem modeled on Laravel. Its goal is to give developers Laravel's cohesive application-building experience through existing Rust crates, consistent conventions, and straightforward integration.
+Aurelin is a Rust web framework ecosystem modeled on Laravel. Its goal is to give developers Laravel's cohesive application-building experience through existing Rust crates, consistent conventions, and straightforward integration.
 
-**For v1, never reinvent the wheel.** Scout for existing implementations of the required Laravel-equivalent capabilities and assemble them into a coherent framework. Kiln's contribution is the integration, configuration, conventions, and starter experience.
+**For v1, never reinvent the wheel.** Scout for existing implementations of the required Laravel-equivalent capabilities and assemble them into a coherent framework. Aurelin's contribution is the integration, configuration, conventions, and starter experience.
 
 This document establishes direction. It does not select crates, define a feature-to-crate mapping, or claim that any functionality is already implemented.
 
 ## Fixed decisions
 
-- **Name:** Kiln.
+- **Name:** Aurelin.
 - **Backend:** Rust.
 - **Behavioral reference:** Laravel 13.
 - **Frontend:** First-class Inertia-style support.
@@ -29,7 +29,7 @@ Before implementing a capability, inspect the relevant Laravel 13 documentation 
 
 Preserve the meaning of the relevant behavior, including its defaults, successful flows, validation, errors, and redirects. Use idiomatic Rust to express that behavior. Matching Laravel does not require reproducing PHP's runtime mechanics or copying its internal architecture line for line.
 
-The explicit Kiln decisions in this document take precedence where they differ from Laravel. A concrete language or integration constraint may require an adaptation; explain that specific difference instead of silently changing the behavior.
+The explicit Aurelin decisions in this document take precedence where they differ from Laravel. A concrete language or integration constraint may require an adaptation; explain that specific difference instead of silently changing the behavior.
 
 Laravel equivalence is the project's direction, not an instruction to implement the entire Laravel ecosystem at once. Work on the capability currently requested.
 
@@ -39,7 +39,7 @@ When implementation begins, investigate existing crates for the capability at ha
 
 Check authoritative crate documentation and source for actual capabilities, supported versions, integration requirements, maintenance, and license compatibility. A package name, README claim, or previous agent answer is not proof that a proposed integration works.
 
-Use existing libraries for the underlying functionality. Kiln may provide configuration, adapters, starter templates, and a consistent public interface where those are necessary to make the selected libraries work together. Prefer using an existing API directly when wrapping it adds no concrete value.
+Use existing libraries for the underlying functionality. Aurelin may provide configuration, adapters, starter templates, and a consistent public interface where those are necessary to make the selected libraries work together. Prefer using an existing API directly when wrapping it adds no concrete value.
 
 Keep integration code focused on the actual gap between the chosen components and the required Laravel behavior. Do not rebuild a subsystem to obtain a preferred API shape, add a general abstraction for hypothetical replacements, or duplicate functionality already supplied by a dependency.
 
@@ -67,19 +67,19 @@ Reference: [Laravel 13 starter kits](https://laravel.com/framework/docs/13.x/sta
 
 ## Rules for agents
 
-- **Do not invent requirements.** A feature must trace to the current task, an explicit Kiln decision, or the relevant verified Laravel behavior. An integration adjustment must trace to an actual dependency or language constraint.
+- **Do not invent requirements.** A feature must trace to the current task, an explicit Aurelin decision, or the relevant verified Laravel behavior. An integration adjustment must trace to an actual dependency or language constraint.
 - **Do not invent facts.** Verify crate names, APIs, versions, capabilities, and compatibility before relying on them. Clearly distinguish a proposal, a verified fact, and implemented behavior.
 - **Do not invent concerns or guards.** Do not add restrictions, validation, fallback behavior, retries, defensive branches, or infrastructure merely because they might be useful. Preserve protections required by the referenced Laravel behavior, documented dependency requirements, or a demonstrated issue in the integration. Tie each addition to concrete evidence.
 - **Keep unknowns explicit.** If a reference cannot be verified, state what remains unknown. Do not fill the gap with remembered behavior or plausible code.
 - **Keep the design proportional.** Add abstractions and configuration only when they solve a present integration or application need. Avoid speculative extension points and architectural layers.
-- **Test the translation and integration.** Verify observable behavior against the chosen reference, including relevant failure paths. Concentrate tests on Kiln's wiring and the starter experience; avoid duplicating upstream library tests or testing hypothetical features.
+- **Test the translation and integration.** Verify observable behavior against the chosen reference, including relevant failure paths. Concentrate tests on Aurelin's wiring and the starter experience; avoid duplicating upstream library tests or testing hypothetical features.
 - **Report what is actually complete.** Separate working, verified behavior from research, planned support, and unresolved gaps. A dependency selection alone does not establish feature parity.
 
 For each requested capability: establish the Laravel behavior, inspect reusable implementations, choose the smallest compatible integration, and verify the result. Keep supporting notes close to the work; this does not require a separate planning bureaucracy.
 
 ## Success criterion
 
-A developer familiar with Laravel should recognize the application workflow, choose Vue or React, and start from working authentication without assembling the framework themselves. Existing libraries perform the underlying work; Kiln makes them operate as one coherent Laravel-style stack in Rust.
+A developer familiar with Laravel should recognize the application workflow, choose Vue or React, and start from working authentication without assembling the framework themselves. Existing libraries perform the underlying work; Aurelin makes them operate as one coherent Laravel-style stack in Rust.
 
 Additional reference: [Inertia](https://inertiajs.com/). Verify the applicable documentation and versions when implementation begins.
 

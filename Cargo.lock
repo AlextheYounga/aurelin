@@ -65,6 +65,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "aurelin-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "include_dir",
+ "tempfile",
+ "toml_edit",
+]
+
+[[package]]
+name = "aurelin-framework"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "config",
+ "dotenvy",
+ "inertia_rs",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tower",
+]
+
+[[package]]
 name = "axum"
 version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -434,34 +462,6 @@ name = "itoa"
 version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3bd1574e617a9a6c1f8f8181bd7e841e1f20e4277607ef28945765188d6284d4"
-
-[[package]]
-name = "kiln-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "clap_complete",
- "include_dir",
- "tempfile",
- "toml_edit",
-]
-
-[[package]]
-name = "kiln-framework"
-version = "0.1.0"
-dependencies = [
- "axum",
- "config",
- "dotenvy",
- "inertia_rs",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tower",
-]
 
 [[package]]
 name = "libc"

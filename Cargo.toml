@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/kiln-cli", "crates/kiln-framework"]
+members = ["crates/aurelin-cli", "crates/aurelin-framework"]
 resolver = "3"
 
 [workspace.lints.clippy]
