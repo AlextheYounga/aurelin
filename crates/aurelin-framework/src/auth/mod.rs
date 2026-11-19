@@ -4,10 +4,10 @@ mod rate_limit;
 
 pub use password::{BcryptPasswordHasher, PasswordHashError};
 pub use password_reset::{
-    ConsumedPasswordReset, PasswordResetBroker, PasswordResetCredentials, PasswordResetError, PasswordResetRepository,
-    PasswordResetRequest, StoredPasswordResetToken,
+    PasswordResetBroker, PasswordResetCredentials, PasswordResetError, PasswordResetRepository, PasswordResetRequest,
+    StoredPasswordResetToken, ValidatedPasswordReset,
 };
-pub use rate_limit::FixedWindowRateLimiter;
+pub use rate_limit::{FixedWindowRateLimiter, RateLimitOutcome};
 
 pub fn digest_token(token: &str) -> String {
     use sha2::{Digest, Sha256};

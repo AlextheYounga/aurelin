@@ -1,6 +1,8 @@
 use std::{net::IpAddr, time::Duration};
 
-use aurelin_framework::auth::FixedWindowRateLimiter;
+use aurelin_framework::auth::{FixedWindowRateLimiter, RateLimitOutcome};
+
+pub const LOGIN_ATTEMPTS_PER_MINUTE: u32 = 5;
 
 #[derive(Clone, Debug)]
 pub struct LoginRateLimiter {
@@ -9,7 +11,7 @@ pub struct LoginRateLimiter {
 
 impl Default for LoginRateLimiter {
     fn default() -> Self {
-        Self { limiter: FixedWindowRateLimiter::new(5, Duration::from_secs(60)) }
+        Self { limiter: FixedWindowRateLimiter::new(LOGIN_ATTEMPTS_PER_MINUTE, Duration::from_secs(60)) }
     }
 }
 
@@ -20,6 +22,10 @@ impl LoginRateLimiter {
 
     pub async fn retry_after(&self, key: &str) -> Option<Duration> {
         self.limiter.retry_after(key).await
+    }
+
+    pub async fn attempt(&self, key: &str) -> RateLimitOutcome {
+        self.limiter.attempt(key).await
     }
 
     pub async fn hit(&self, key: &str) {

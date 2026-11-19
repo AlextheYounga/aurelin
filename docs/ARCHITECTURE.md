@@ -119,14 +119,27 @@ and session-ID rotation, and `axum-tower-sessions-csrf` 0.1.1 validates
 state-changing requests.
 
 Password-reset tokens are random, stored only as SHA-256 digests, expire after
-60 minutes, and are consumed transactionally with password changes. Email
-verification uses Fortify-owned temporary signed URLs backed by `APP_KEY`
-instead of application token storage. Password confirmation verifies the
-current password and records the confirmation time in the session. The current
-development notification path logs reset and verification URLs. Production mail delivery,
-confirmed-route freshness enforcement, and remaining official starter behavior
-are not implemented, so this remains a partial authentication starter rather
-than a parity claim.
+60 minutes, and are deleted after Fortify invokes the generated application's
+password-reset action. The broker preserves Laravel's sent, unknown-user,
+throttled, invalid-token, and successful-reset outcomes. Email verification
+uses Fortify-owned temporary signed URLs backed by `APP_KEY` instead of
+application token storage. Login requests use the starter's five-per-minute
+email-and-IP limit; verification requests use Fortify's six-per-minute user
+limit. Both return HTTP 429 and Laravel's rate-limit headers when exhausted.
+
+Login, registration, and password-reset routes enforce Fortify's guest-only
+boundary for both views and submissions. Password confirmation uses Fortify's
+`/user/confirm-password` route, verifies the current password, and records the
+confirmation time in the session. Local and test environments require
+eight-character passwords. Production also requires 12 characters, mixed case,
+a number, and a symbol, and supplies the same browser `passwordrules` hints as
+the starter. Laravel's production `uncompromised` check is not yet implemented.
+
+The current development notification path logs reset and verification URLs.
+Production mail delivery, confirmed-route freshness enforcement, two-factor
+authentication, passkeys, and remaining official starter behavior are not
+implemented, so this remains a partial authentication starter rather than a
+parity claim.
 
 Generated applications keep reusable behavior in a library target and a thin
 binary entry point. All Rust tests live in each crate's root `tests/` directory;

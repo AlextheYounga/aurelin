@@ -13,6 +13,12 @@ pub struct FixedWindowRateLimiter {
     entries: Arc<Mutex<HashMap<String, Window>>>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RateLimitOutcome {
+    Allowed { remaining: u32 },
+    Limited { retry_after: Duration },
+}
+
 #[derive(Clone, Copy, Debug)]
 struct Window {
     hits: u32,
@@ -30,6 +36,20 @@ impl FixedWindowRateLimiter {
         entries.retain(|_, window| window.expires_at > now);
         let window = entries.get(key)?;
         (window.hits >= self.limit).then(|| window.expires_at.saturating_duration_since(now))
+    }
+
+    pub async fn attempt(&self, key: &str) -> RateLimitOutcome {
+        let now = Instant::now();
+        let mut entries = self.entries.lock().await;
+        entries.retain(|_, window| window.expires_at > now);
+
+        let window = entries.entry(key.to_owned()).or_insert(Window { hits: 0, expires_at: now + self.window });
+        if window.hits >= self.limit {
+            return RateLimitOutcome::Limited { retry_after: window.expires_at.saturating_duration_since(now) };
+        }
+
+        window.hits += 1;
+        RateLimitOutcome::Allowed { remaining: self.limit - window.hits }
     }
 
     pub async fn hit(&self, key: &str) {

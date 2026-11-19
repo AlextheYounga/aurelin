@@ -142,7 +142,14 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
             Frontend::Vue => VUE.extract(path).context("extract the Vue starter")?,
         }
     }
-    for source in [path.join("src/main.rs"), path.join("tests/application.rs"), path.join("tests/authentication.rs")] {
+    for source in [
+        path.join("src/main.rs"),
+        path.join("tests/application.rs"),
+        path.join("tests/authentication.rs"),
+        path.join("tests/email_verification.rs"),
+        path.join("tests/password_reset.rs"),
+        path.join("tests/password_policy.rs"),
+    ] {
         if !source.exists() {
             continue;
         }

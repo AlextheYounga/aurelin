@@ -3,9 +3,10 @@ import { Form, Head, Link } from '@inertiajs/react';
 type Props = {
     csrf_token: string;
     errors: Record<string, string>;
+    passwordRules: string;
 };
 
-export default function Register({ csrf_token, errors }: Props) {
+export default function Register({ csrf_token, errors, passwordRules }: Props) {
     return (
         <main>
             <Head title="Register" />
@@ -22,11 +23,11 @@ export default function Register({ csrf_token, errors }: Props) {
                         {errors.email && <p role="alert">{errors.email}</p>}
 
                         <label htmlFor="password">Password</label>
-                        <input id="password" name="password" type="password" required autoComplete="new-password" />
+                        <input id="password" name="password" type="password" required autoComplete="new-password" passwordrules={passwordRules} />
                         {errors.password && <p role="alert">{errors.password}</p>}
 
                         <label htmlFor="password_confirmation">Confirm password</label>
-                        <input id="password_confirmation" name="password_confirmation" type="password" required autoComplete="new-password" />
+                        <input id="password_confirmation" name="password_confirmation" type="password" required autoComplete="new-password" passwordrules={passwordRules} />
 
                         <button type="submit" disabled={processing}>Create account</button>
                     </>

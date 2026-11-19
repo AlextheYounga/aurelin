@@ -1,4 +1,6 @@
+use aurelin_fortify::EMAIL_VERIFICATION_ATTEMPTS_PER_MINUTE;
 use aurelin_framework::{
+    auth::RateLimitOutcome,
     axum::{
         Router,
         extract::{Path, Query, State},
@@ -16,6 +18,7 @@ use crate::{
     frontend::Frontend,
     frontend_config::VERIFY_EMAIL_COMPONENT,
     routes::{
+        rate_limit,
         session_feedback::{FLASH_STATUS, ValidationErrors},
         web_error::WebError,
     },
@@ -79,8 +82,18 @@ async fn send_verification_notification(
     let Some(user) = auth.user.as_ref() else {
         return Ok(request.redirect(Inertia::redirect("/login"))?);
     };
+    let remaining = match auth.backend.email_verification_attempt(user.id).await {
+        RateLimitOutcome::Allowed { remaining } => remaining,
+        RateLimitOutcome::Limited { retry_after } => {
+            return Ok(rate_limit::too_many_attempts(
+                EMAIL_VERIFICATION_ATTEMPTS_PER_MINUTE,
+                retry_after,
+            ));
+        }
+    };
     if user.email_verified_at.is_some() {
-        return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
+        let response = request.redirect(Inertia::redirect("/dashboard"))?;
+        return Ok(with_rate_limit_headers(response, remaining));
     }
     let verification_url = auth.backend.email_verification_url(user)?;
     tracing::info!(
@@ -90,7 +103,8 @@ async fn send_verification_notification(
     auth.session
         .insert(FLASH_STATUS, "verification-link-sent")
         .await?;
-    Ok(request.redirect(Inertia::redirect("/email/verify"))?)
+    let response = request.redirect(Inertia::redirect("/email/verify"))?;
+    Ok(with_rate_limit_headers(response, remaining))
 }
 
 async fn verify_email(
@@ -102,22 +116,45 @@ async fn verify_email(
     let Some(user) = auth.user.as_ref() else {
         return Ok(request.redirect(Inertia::redirect("/login"))?);
     };
+    let remaining = match auth.backend.email_verification_attempt(user.id).await {
+        RateLimitOutcome::Allowed { remaining } => remaining,
+        RateLimitOutcome::Limited { retry_after } => {
+            return Ok(rate_limit::too_many_attempts(
+                EMAIL_VERIFICATION_ATTEMPTS_PER_MINUTE,
+                retry_after,
+            ));
+        }
+    };
     if user.id != user_id {
-        return Ok((StatusCode::FORBIDDEN, "Invalid verification link").into_response());
+        let response = (StatusCode::FORBIDDEN, "Invalid verification link").into_response();
+        return Ok(with_rate_limit_headers(response, remaining));
     }
     if user.email_verified_at.is_some() {
-        return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
+        let response = request.redirect(Inertia::redirect("/dashboard"))?;
+        return Ok(with_rate_limit_headers(response, remaining));
     }
     if !auth
         .backend
         .verify_email(user, &email_hash, query.expires, &query.signature)
         .await?
     {
-        return Ok((
+        let response = (
             StatusCode::FORBIDDEN,
             "Invalid or expired verification link",
         )
-            .into_response());
+            .into_response();
+        return Ok(with_rate_limit_headers(response, remaining));
     }
-    Ok(request.redirect(Inertia::redirect("/dashboard?verified=1"))?)
+    let response = request.redirect(Inertia::redirect("/dashboard?verified=1"))?;
+    Ok(with_rate_limit_headers(response, remaining))
+}
+
+fn with_rate_limit_headers(mut response: Response, remaining: u32) -> Response {
+    rate_limit::add_headers(
+        &mut response,
+        EMAIL_VERIFICATION_ATTEMPTS_PER_MINUTE,
+        remaining,
+        None,
+    );
+    response
 }

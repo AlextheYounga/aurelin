@@ -1,12 +1,10 @@
 use aurelin_framework::{
+    auth::PasswordResetRequest,
     axum::{
         Json, Router,
-        extract::{
-            Path, Query, State,
-            rejection::{JsonRejection, QueryRejection},
-        },
+        extract::{Path, Query, State, rejection::JsonRejection},
         response::{IntoResponse, Response},
-        routing::get,
+        routing::{get, post},
     },
     inertia::{Inertia, axum::InertiaRequest},
 };
@@ -38,6 +36,8 @@ struct ResetPasswordProps {
     csrf_token: String,
     email: String,
     token: String,
+    #[serde(rename = "passwordRules")]
+    password_rules: &'static str,
 }
 
 #[derive(Deserialize, Validate)]
@@ -48,7 +48,11 @@ struct ForgotPasswordInput {
 
 #[derive(Deserialize, Validate)]
 struct ResetPasswordInput {
-    #[validate(length(min = 8, max = 1024))]
+    #[validate(email, length(max = 255))]
+    email: String,
+    #[validate(length(min = 1))]
+    token: String,
+    #[validate(length(min = 8))]
     password: String,
     password_confirmation: String,
 }
@@ -65,10 +69,8 @@ pub fn routes() -> Router<Frontend> {
             "/forgot-password",
             get(forgot_password).post(send_password_reset_link),
         )
-        .route(
-            "/reset-password/{token}",
-            get(reset_password).post(store_reset_password),
-        )
+        .route("/reset-password/{token}", get(reset_password))
+        .route("/reset-password", post(store_reset_password))
 }
 
 async fn forgot_password(
@@ -76,6 +78,9 @@ async fn forgot_password(
     auth: AuthSession,
     request: InertiaRequest,
 ) -> Result<Response, WebError> {
+    if auth.user.is_some() {
+        return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
+    }
     let csrf_token = get_or_create_token(&auth.session)
         .await
         .map_err(WebError::Csrf)?;
@@ -106,6 +111,9 @@ async fn send_password_reset_link(
         ValidationRejection<ValidatorInputErrors, JsonRejection>,
     >,
 ) -> Result<Response, WebError> {
+    if auth.user.is_some() {
+        return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
+    }
     let input = match input {
         Ok(Valid(Json(input))) => input,
         Err(ValidationRejection::Valid(_)) => {
@@ -120,19 +128,38 @@ async fn send_password_reset_link(
         }
         Err(ValidationRejection::Inner(error)) => return Ok(error.into_response()),
     };
-    if let Some(token) = auth
+    match auth
         .backend
         .create_password_reset_token(&input.email)
         .await?
     {
-        let email = urlencoding::encode(&input.email);
-        tracing::info!(reset_url = %format!("/reset-password/{token}?email={email}"), "password reset notification");
+        PasswordResetRequest::Sent { token } => {
+            let email = urlencoding::encode(&input.email);
+            tracing::info!(reset_url = %format!("/reset-password/{token}?email={email}"), "password reset notification");
+        }
+        PasswordResetRequest::UnknownUser => {
+            return redirect_with_error(
+                &auth,
+                &request,
+                "email",
+                "We can't find a user with that email address.",
+                "/forgot-password",
+            )
+            .await;
+        }
+        PasswordResetRequest::Throttled => {
+            return redirect_with_error(
+                &auth,
+                &request,
+                "email",
+                "Please wait before retrying.",
+                "/forgot-password",
+            )
+            .await;
+        }
     }
     auth.session
-        .insert(
-            FLASH_STATUS,
-            "If an account exists for that email, a password reset link has been sent.",
-        )
+        .insert(FLASH_STATUS, "We have emailed your password reset link.")
         .await?;
     Ok(request.redirect(Inertia::redirect("/forgot-password"))?)
 }
@@ -144,6 +171,9 @@ async fn reset_password(
     Path(token): Path<String>,
     Valid(Query(query)): Valid<Query<ResetPasswordQuery>>,
 ) -> Result<Response, WebError> {
+    if auth.user.is_some() {
+        return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
+    }
     let csrf_token = get_or_create_token(&auth.session)
         .await
         .map_err(WebError::Csrf)?;
@@ -160,6 +190,7 @@ async fn reset_password(
                 csrf_token,
                 email: query.email,
                 token,
+                password_rules: auth.backend.password_rules(),
             },
         ),
         move |context| frontend.document(context),
@@ -169,50 +200,21 @@ async fn reset_password(
 async fn store_reset_password(
     auth: AuthSession,
     request: InertiaRequest,
-    Path(token): Path<String>,
-    query: Result<
-        Valid<Query<ResetPasswordQuery>>,
-        ValidationRejection<ValidatorInputErrors, QueryRejection>,
-    >,
-    input: Result<
-        Valid<Json<ResetPasswordInput>>,
-        ValidationRejection<ValidatorInputErrors, JsonRejection>,
-    >,
+    input: Result<Json<ResetPasswordInput>, JsonRejection>,
 ) -> Result<Response, WebError> {
-    let query = match query {
-        Ok(Valid(Query(query))) => query,
-        Err(ValidationRejection::Valid(_)) => {
-            return redirect_with_error(
-                &auth,
-                &request,
-                "email",
-                "The email must be a valid email address.",
-                "/forgot-password",
-            )
-            .await;
-        }
-        Err(ValidationRejection::Inner(error)) => return Ok(error.into_response()),
+    if auth.user.is_some() {
+        return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
+    }
+    let Json(input) = match input {
+        Ok(input) => input,
+        Err(error) => return Ok(error.into_response()),
     };
     let destination = format!(
         "/reset-password/{}?email={}",
-        token,
-        urlencoding::encode(&query.email)
+        input.token,
+        urlencoding::encode(&input.email)
     );
-    let input = match input {
-        Ok(Valid(Json(input))) => input,
-        Err(ValidationRejection::Valid(_)) => {
-            return redirect_with_error(
-                &auth,
-                &request,
-                "password",
-                "The password must be at least 8 characters and match its confirmation.",
-                &destination,
-            )
-            .await;
-        }
-        Err(ValidationRejection::Inner(error)) => return Ok(error.into_response()),
-    };
-    if input.password != input.password_confirmation {
+    if input.validate().is_err() || input.password != input.password_confirmation {
         return redirect_with_error(
             &auth,
             &request,
@@ -222,16 +224,26 @@ async fn store_reset_password(
         )
         .await;
     }
+    if let Err(violation) = auth.backend.validate_password(&input.password) {
+        return redirect_with_error(
+            &auth,
+            &request,
+            "password",
+            &violation.message(),
+            &destination,
+        )
+        .await;
+    }
     if !auth
         .backend
-        .reset_password(&query.email, &token, &input.password)
+        .reset_password(&input.email, &input.token, &input.password)
         .await?
     {
         return redirect_with_error(
             &auth,
             &request,
             "email",
-            "This password reset token is invalid or has expired.",
+            "This password reset token is invalid.",
             &destination,
         )
         .await;

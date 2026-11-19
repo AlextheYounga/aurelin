@@ -11,7 +11,14 @@ use tower::ServiceExt;
 #[tokio::test]
 async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
 -> Result<(), Box<dyn Error>> {
-    let app = application(Frontend::new(), "sqlite::memory:", false, b"test-key").await?;
+    let app = application(
+        Frontend::new(),
+        "sqlite::memory:",
+        false,
+        b"test-key",
+        "local",
+    )
+    .await?;
     let register_page = app
         .clone()
         .oneshot(request(Method::GET, "/register", None, None, None)?)
@@ -75,7 +82,71 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
     assert_eq!(verification.status(), StatusCode::OK);
     let authenticated_csrf = csrf_token(verification).await?;
 
-    let resent = app
+    for uri in [
+        "/login",
+        "/register",
+        "/forgot-password",
+        "/reset-password/token?email=ada%40example.com",
+    ] {
+        let response = app
+            .clone()
+            .oneshot(request(
+                Method::GET,
+                uri,
+                Some(&authenticated_cookie),
+                None,
+                None,
+            )?)
+            .await?;
+        assert_eq!(response.status(), StatusCode::FOUND, "{uri}");
+        assert_eq!(response.headers()[header::LOCATION], "/dashboard", "{uri}");
+    }
+
+    for (uri, body) in [
+        (
+            "/login",
+            r#"{"email":"ada@example.com","password":"correct-horse"}"#,
+        ),
+        ("/register", registration_json()),
+        ("/forgot-password", r#"{"email":"ada@example.com"}"#),
+        (
+            "/reset-password",
+            r#"{"email":"ada@example.com","token":"invalid","password":"new-password","password_confirmation":"new-password"}"#,
+        ),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(request(
+                Method::POST,
+                uri,
+                Some(&authenticated_cookie),
+                Some(&authenticated_csrf),
+                Some(body),
+            )?)
+            .await?;
+        assert_eq!(response.status(), StatusCode::SEE_OTHER, "{uri}");
+        assert_eq!(response.headers()[header::LOCATION], "/dashboard", "{uri}");
+    }
+
+    for remaining in (0..6).rev() {
+        let resent = app
+            .clone()
+            .oneshot(request(
+                Method::POST,
+                "/email/verification-notification",
+                Some(&authenticated_cookie),
+                Some(&authenticated_csrf),
+                Some("{}"),
+            )?)
+            .await?;
+        assert_eq!(resent.status(), StatusCode::SEE_OTHER);
+        assert_eq!(resent.headers()["x-ratelimit-limit"], "6");
+        assert_eq!(
+            resent.headers()["x-ratelimit-remaining"],
+            remaining.to_string()
+        );
+    }
+    let throttled_verification = app
         .clone()
         .oneshot(request(
             Method::POST,
@@ -85,13 +156,21 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
             Some("{}"),
         )?)
         .await?;
-    assert_eq!(resent.status(), StatusCode::SEE_OTHER);
+    assert_eq!(
+        throttled_verification.status(),
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    assert!(
+        throttled_verification
+            .headers()
+            .contains_key(header::RETRY_AFTER)
+    );
 
     let confirmation = app
         .clone()
         .oneshot(request(
             Method::GET,
-            "/confirm-password",
+            "/user/confirm-password",
             Some(&authenticated_cookie),
             None,
             None,
@@ -99,17 +178,56 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
         .await?;
     assert_eq!(confirmation.status(), StatusCode::OK);
 
+    let confirmation_status = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            "/user/confirmed-password-status",
+            Some(&authenticated_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    assert!(
+        String::from_utf8(
+            to_bytes(confirmation_status.into_body(), usize::MAX)
+                .await?
+                .to_vec(),
+        )?
+        .contains(r#""confirmed":false"#)
+    );
+
     let confirmed = app
         .clone()
         .oneshot(request(
             Method::POST,
-            "/confirm-password",
+            "/user/confirm-password",
             Some(&authenticated_cookie),
             Some(&authenticated_csrf),
             Some(r#"{"password":"correct-horse"}"#),
         )?)
         .await?;
     assert_eq!(confirmed.status(), StatusCode::SEE_OTHER);
+
+    let confirmation_status = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            "/user/confirmed-password-status",
+            Some(&authenticated_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    assert!(confirmation_status.headers().contains_key("x-retry-after"));
+    assert!(
+        String::from_utf8(
+            to_bytes(confirmation_status.into_body(), usize::MAX)
+                .await?
+                .to_vec(),
+        )?
+        .contains(r#""confirmed":true"#)
+    );
 
     let logged_out = app
         .clone()
@@ -125,7 +243,13 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
 
     let unauthenticated_confirmation = app
         .clone()
-        .oneshot(request(Method::GET, "/confirm-password", None, None, None)?)
+        .oneshot(request(
+            Method::GET,
+            "/user/confirm-password",
+            None,
+            None,
+            None,
+        )?)
         .await?;
     assert_eq!(unauthenticated_confirmation.status(), StatusCode::FOUND);
     assert_eq!(
@@ -139,7 +263,19 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
         .await?;
     let login_cookie = session_cookie(&login_page)?;
     let login_csrf = csrf_token(login_page).await?;
-    for _ in 0..6 {
+    let guest_logout = app
+        .clone()
+        .oneshot(request(
+            Method::POST,
+            "/logout",
+            Some(&login_cookie),
+            Some(&login_csrf),
+            Some("{}"),
+        )?)
+        .await?;
+    assert_eq!(guest_logout.status(), StatusCode::SEE_OTHER);
+    assert_eq!(guest_logout.headers()[header::LOCATION], "/login");
+    for remaining in (0..5).rev() {
         let failed = app
             .clone()
             .oneshot(request(
@@ -151,22 +287,26 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
             )?)
             .await?;
         assert_eq!(failed.status(), StatusCode::SEE_OTHER);
+        assert_eq!(failed.headers()["x-ratelimit-limit"], "5");
+        assert_eq!(
+            failed.headers()["x-ratelimit-remaining"],
+            remaining.to_string()
+        );
     }
-    let throttled_page = app
+    let throttled = app
         .oneshot(request(
-            Method::GET,
+            Method::POST,
             "/login",
             Some(&login_cookie),
-            None,
-            None,
+            Some(&login_csrf),
+            Some(r#"{"email":"ada@example.com","password":"correct-horse"}"#),
         )?)
         .await?;
-    let body = String::from_utf8(
-        to_bytes(throttled_page.into_body(), usize::MAX)
-            .await?
-            .to_vec(),
-    )?;
-    assert!(body.contains("Too many login attempts"));
+    assert_eq!(throttled.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(throttled.headers()["x-ratelimit-limit"], "5");
+    assert_eq!(throttled.headers()["x-ratelimit-remaining"], "0");
+    assert!(throttled.headers().contains_key(header::RETRY_AFTER));
+    assert!(throttled.headers().contains_key("x-ratelimit-reset"));
     Ok(())
 }
 

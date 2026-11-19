@@ -15,6 +15,7 @@ mod entities;
 pub mod frontend;
 pub mod frontend_config;
 mod migration;
+mod password_policy;
 pub mod routes;
 
 pub async fn run() -> Result<(), Box<dyn Error>> {
@@ -34,6 +35,10 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
         .unwrap_or("false")
         .parse::<bool>()?;
     let application_key = environment.get("APP_KEY").ok_or("APP_KEY must be set")?;
+    let application_environment = environment
+        .get("APP_ENV")
+        .map(String::as_str)
+        .unwrap_or("local");
     let frontend = frontend::Frontend::new();
     let _dev_server = frontend.start_dev_server();
     let listener = TcpListener::bind((config.host.as_str(), config.port)).await?;
@@ -43,6 +48,7 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
         database_url,
         secure_cookie,
         application_key.as_bytes(),
+        application_environment,
     )
     .await?;
     aurelin_framework::axum::serve(

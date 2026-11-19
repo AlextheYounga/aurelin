@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Form, Head, Link } from '@inertiajs/vue3';
 
-defineProps<{ csrf_token: string; errors: Record<string, string> }>();
+defineProps<{ csrf_token: string; errors: Record<string, string>; passwordRules: string }>();
 </script>
 
 <template>
@@ -18,11 +18,11 @@ defineProps<{ csrf_token: string; errors: Record<string, string> }>();
             <p v-if="errors.email" role="alert">{{ errors.email }}</p>
 
             <label for="password">Password</label>
-            <input id="password" name="password" type="password" required autocomplete="new-password" />
+            <input id="password" name="password" type="password" required autocomplete="new-password" :passwordrules="passwordRules" />
             <p v-if="errors.password" role="alert">{{ errors.password }}</p>
 
             <label for="password_confirmation">Confirm password</label>
-            <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password" />
+            <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password" :passwordrules="passwordRules" />
 
             <button type="submit" :disabled="processing">Create account</button>
         </Form>

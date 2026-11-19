@@ -8,8 +8,8 @@ use std::{
 
 use aurelin_framework::{
     auth::{
-        BcryptPasswordHasher, ConsumedPasswordReset, FixedWindowRateLimiter, PasswordResetBroker,
-        PasswordResetCredentials, PasswordResetRepository, PasswordResetRequest, StoredPasswordResetToken,
+        BcryptPasswordHasher, FixedWindowRateLimiter, PasswordResetBroker, PasswordResetCredentials,
+        PasswordResetRepository, PasswordResetRequest, RateLimitOutcome, StoredPasswordResetToken,
     },
     signed_url::TemporarySignedUrl,
 };
@@ -28,10 +28,9 @@ async fn bcrypt_uses_laravels_default_cost_and_verifies_passwords() {
 #[tokio::test]
 async fn fixed_windows_block_after_the_configured_number_of_hits_and_can_be_cleared() {
     let limiter = FixedWindowRateLimiter::new(2, Duration::from_secs(60));
-    assert!(limiter.retry_after("login").await.is_none());
-    limiter.hit("login").await;
-    limiter.hit("login").await;
-    assert!(limiter.retry_after("login").await.is_some());
+    assert_eq!(limiter.attempt("login").await, RateLimitOutcome::Allowed { remaining: 1 });
+    assert_eq!(limiter.attempt("login").await, RateLimitOutcome::Allowed { remaining: 0 });
+    assert!(matches!(limiter.attempt("login").await, RateLimitOutcome::Limited { .. }));
     limiter.clear("login").await;
     assert!(limiter.retry_after("login").await.is_none());
 }
@@ -59,37 +58,34 @@ async fn password_broker_owns_token_throttling_expiration_and_consumption() {
     assert!(!token.is_empty());
     assert_eq!(broker.create_token("ada@example.com", 1_030).await.ok(), Some(PasswordResetRequest::Throttled));
     assert_eq!(broker.create_token("unknown@example.com", 1_030).await.ok(), Some(PasswordResetRequest::UnknownUser));
-    assert_eq!(
-        broker
-            .reset(
-                PasswordResetCredentials { email: "ada@example.com", token: "wrong", password: "new-password" },
-                1_040,
-            )
-            .await
-            .ok(),
-        Some(false)
-    );
-    assert_eq!(
-        broker
-            .reset(
-                PasswordResetCredentials { email: "ada@example.com", token: &token, password: "new-password" },
-                4_601,
-            )
-            .await
-            .ok(),
-        Some(false)
-    );
-    assert_eq!(
-        broker
-            .reset(
-                PasswordResetCredentials { email: "ada@example.com", token: &token, password: "new-password" },
-                1_040,
-            )
-            .await
-            .ok(),
-        Some(true)
-    );
-    assert!(repository.password_hash().starts_with("$2b$12$"));
+    let wrong = broker
+        .validate_reset(
+            PasswordResetCredentials { email: "ada@example.com", token: "wrong", password: "new-password" },
+            1_040,
+        )
+        .await;
+    assert!(matches!(wrong, Ok(None)));
+    let expired = broker
+        .validate_reset(
+            PasswordResetCredentials { email: "ada@example.com", token: &token, password: "new-password" },
+            4_601,
+        )
+        .await;
+    assert!(matches!(expired, Ok(None)));
+    let reset = broker
+        .validate_reset(
+            PasswordResetCredentials { email: "ada@example.com", token: &token, password: "new-password" },
+            1_040,
+        )
+        .await
+        .ok()
+        .flatten();
+    assert!(reset.is_some());
+    if let Some(reset) = reset {
+        assert_eq!(reset.password, "new-password");
+        assert_eq!(broker.complete_reset(&reset).await.ok(), Some(true));
+    }
+    assert!(repository.token("ada@example.com").await.ok().flatten().is_none());
 }
 
 #[derive(Clone, Default)]
@@ -112,10 +108,6 @@ impl MemoryResetRepository {
             })),
         }
     }
-
-    fn password_hash(&self) -> String {
-        self.state.lock().ok().and_then(|state| state.users.get("ada@example.com").cloned()).unwrap_or_default()
-    }
 }
 
 impl PasswordResetRepository for MemoryResetRepository {
@@ -136,18 +128,14 @@ impl PasswordResetRepository for MemoryResetRepository {
         Ok(())
     }
 
-    async fn consume_token(&self, reset: ConsumedPasswordReset<'_>) -> Result<bool, Self::Error> {
+    async fn delete_token(&self, email: &str, expected_digest: &str) -> Result<bool, Self::Error> {
         let Ok(mut state) = self.state.lock() else {
             return Ok(false);
         };
-        if !state.tokens.get(reset.email).is_some_and(|token| token.digest == reset.expected_digest) {
+        if !state.tokens.get(email).is_some_and(|token| token.digest == expected_digest) {
             return Ok(false);
         }
-        state.tokens.remove(reset.email);
-        let Some(password) = state.users.get_mut(reset.email) else {
-            return Ok(false);
-        };
-        *password = reset.password_hash.to_owned();
+        state.tokens.remove(email);
         Ok(true)
     }
 }

@@ -14,6 +14,7 @@ pub async fn application(
     database_url: &str,
     secure_cookie: bool,
     application_key: &[u8],
+    application_environment: &str,
 ) -> Result<Router, Box<dyn std::error::Error>> {
     let version = frontend.version();
     let database = crate::database::connect(database_url).await?;
@@ -25,7 +26,7 @@ pub async fn application(
         secure_cookie,
     );
     let auth_layer = AuthManagerLayerBuilder::new(
-        AuthBackend::new(database, application_key).await?,
+        AuthBackend::new(database, application_key, application_environment).await?,
         session_layer,
     )
     .build();

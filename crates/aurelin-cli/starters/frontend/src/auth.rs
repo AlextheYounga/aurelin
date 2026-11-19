@@ -4,25 +4,29 @@ use std::{
 };
 
 use aurelin_fortify::{
-    CreatesNewUsers, EmailVerification, EmailVerificationError, EmailVerificationRequest,
-    LoginRateLimiter, RegistrationInput,
+    CreatesNewUsers, EmailVerification, EmailVerificationError, EmailVerificationRateLimiter,
+    EmailVerificationRequest, LoginRateLimiter, RegistrationInput, ResetPasswords,
+    ResetPasswordsError,
 };
 use aurelin_framework::auth::{
-    BcryptPasswordHasher, ConsumedPasswordReset, PasswordHashError, PasswordResetBroker,
-    PasswordResetCredentials, PasswordResetError, PasswordResetRepository, PasswordResetRequest,
+    BcryptPasswordHasher, PasswordHashError, PasswordResetBroker, PasswordResetCredentials,
+    PasswordResetError, PasswordResetRepository, PasswordResetRequest, RateLimitOutcome,
     StoredPasswordResetToken,
 };
 use axum_login::{AuthUser, AuthnBackend, UserId};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
-    QueryFilter, TransactionTrait, sea_query::OnConflict,
+    QueryFilter, sea_query::OnConflict,
 };
 use serde::Serialize;
 use thiserror::Error;
 
 use crate::{
-    actions::{CreateNewUser, CreateNewUserError, CreateUser},
+    actions::{
+        CreateNewUser, CreateNewUserError, CreateUser, ResetUserPassword, ResetUserPasswordError,
+    },
     entities::{password_reset_token, user},
+    password_policy::{PasswordPolicy, PasswordPolicyViolation},
 };
 
 pub type AuthSession = axum_login::AuthSession<AuthBackend>;
@@ -71,22 +75,32 @@ pub struct AuthBackend {
     dummy_password_hash: Arc<String>,
     passwords: BcryptPasswordHasher,
     attempts: LoginRateLimiter,
-    password_resets: PasswordResetBroker<AuthRepository>,
+    password_reset_tokens: PasswordResetBroker<AuthRepository>,
+    reset_passwords: ResetPasswords<AuthRepository, ResetUserPassword>,
     create_new_user: CreateNewUser,
     email_verification: EmailVerification,
+    email_verification_attempts: EmailVerificationRateLimiter,
+    password_policy: PasswordPolicy,
 }
 
 impl AuthBackend {
     pub async fn new(
         database: DatabaseConnection,
         application_key: &[u8],
+        application_environment: &str,
     ) -> Result<Self, AuthError> {
         let passwords = BcryptPasswordHasher::default();
         let dummy_password_hash = passwords.hash("aurelin-invalid-credentials").await?;
         Ok(Self {
-            password_resets: PasswordResetBroker::new(AuthRepository(database.clone())),
+            password_reset_tokens: PasswordResetBroker::new(AuthRepository(database.clone())),
+            reset_passwords: ResetPasswords::new(
+                AuthRepository(database.clone()),
+                ResetUserPassword::new(database.clone(), passwords),
+            ),
             create_new_user: CreateNewUser::new(database.clone(), passwords),
             email_verification: EmailVerification::new(application_key)?,
+            email_verification_attempts: EmailVerificationRateLimiter::default(),
+            password_policy: PasswordPolicy::for_environment(application_environment),
             database,
             dummy_password_hash: Arc::new(dummy_password_hash),
             passwords,
@@ -110,33 +124,27 @@ impl AuthBackend {
             .await?)
     }
 
-    pub async fn too_many_login_attempts(&self, key: &str) -> bool {
-        if self.attempts.retry_after(key).await.is_some() {
-            return true;
-        }
-        self.attempts.hit(key).await;
-        false
+    pub async fn login_attempt(&self, key: &str) -> RateLimitOutcome {
+        self.attempts.attempt(key).await
     }
 
-    pub async fn clear_login_attempts(&self, key: &str) {
-        self.attempts.clear(key).await;
+    pub fn validate_password(&self, password: &str) -> Result<(), PasswordPolicyViolation> {
+        self.password_policy.validate(password)
+    }
+
+    pub fn password_rules(&self) -> &'static str {
+        self.password_policy.browser_rules()
     }
 
     pub async fn create_password_reset_token(
         &self,
         email: &str,
-    ) -> Result<Option<String>, AuthError> {
+    ) -> Result<PasswordResetRequest, AuthError> {
         let email = normalize_email(email);
-        Ok(
-            match self
-                .password_resets
-                .create_token(&email, unix_timestamp()?)
-                .await?
-            {
-                PasswordResetRequest::Sent { token } => Some(token),
-                PasswordResetRequest::UnknownUser | PasswordResetRequest::Throttled => None,
-            },
-        )
+        Ok(self
+            .password_reset_tokens
+            .create_token(&email, unix_timestamp()?)
+            .await?)
     }
 
     pub async fn reset_password(
@@ -147,7 +155,7 @@ impl AuthBackend {
     ) -> Result<bool, AuthError> {
         let email = normalize_email(email);
         Ok(self
-            .password_resets
+            .reset_passwords
             .reset(
                 PasswordResetCredentials {
                     email: &email,
@@ -193,6 +201,10 @@ impl AuthBackend {
         user.update(&self.database).await?;
         Ok(true)
     }
+
+    pub async fn email_verification_attempt(&self, user_id: i64) -> RateLimitOutcome {
+        self.email_verification_attempts.attempt(user_id).await
+    }
 }
 
 impl AuthnBackend for AuthBackend {
@@ -234,6 +246,8 @@ pub enum AuthError {
     Password(#[from] PasswordHashError),
     #[error(transparent)]
     PasswordReset(#[from] PasswordResetError<DbErr>),
+    #[error(transparent)]
+    ResetPasswords(#[from] ResetPasswordsError<DbErr, ResetUserPasswordError>),
     #[error(transparent)]
     CreateNewUser(#[from] CreateNewUserError),
     #[error(transparent)]
@@ -289,33 +303,13 @@ impl PasswordResetRepository for AuthRepository {
         Ok(())
     }
 
-    async fn consume_token(&self, reset: ConsumedPasswordReset<'_>) -> Result<bool, Self::Error> {
-        let transaction = self.0.begin().await?;
-        let Some(token) = password_reset_token::Entity::find_by_id(reset.email)
-            .one(&transaction)
-            .await?
-        else {
-            return Ok(false);
-        };
-        if token.token_hash != reset.expected_digest {
-            return Ok(false);
-        }
-        let Some(user) = user::Entity::find()
-            .filter(user::Column::Email.eq(reset.email))
-            .one(&transaction)
-            .await?
-        else {
-            return Ok(false);
-        };
-        let mut user: user::ActiveModel = user.into();
-        user.password_hash = Set(reset.password_hash.to_owned());
-        user.updated_at = Set(reset.updated_at);
-        user.update(&transaction).await?;
-        password_reset_token::Entity::delete_by_id(reset.email)
-            .exec(&transaction)
+    async fn delete_token(&self, email: &str, expected_digest: &str) -> Result<bool, Self::Error> {
+        let result = password_reset_token::Entity::delete_many()
+            .filter(password_reset_token::Column::Email.eq(email))
+            .filter(password_reset_token::Column::TokenHash.eq(expected_digest))
+            .exec(&self.0)
             .await?;
-        transaction.commit().await?;
-        Ok(true)
+        Ok(result.rows_affected == 1)
     }
 }
 

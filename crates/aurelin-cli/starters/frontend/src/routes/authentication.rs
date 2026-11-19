@@ -1,7 +1,8 @@
 use std::net::SocketAddr;
 
-use aurelin_fortify::LoginRateLimiter;
+use aurelin_fortify::{LOGIN_ATTEMPTS_PER_MINUTE, LoginRateLimiter};
 use aurelin_framework::{
+    auth::RateLimitOutcome,
     axum::{
         Json, Router,
         extract::{ConnectInfo, State, rejection::JsonRejection},
@@ -21,6 +22,7 @@ use crate::{
     frontend::Frontend,
     frontend_config::{DASHBOARD_COMPONENT, LOGIN_COMPONENT, REGISTER_COMPONENT},
     routes::{
+        rate_limit,
         session_feedback::{FLASH_ERRORS, FLASH_STATUS, ValidationErrors, redirect_with_error},
         web_error::WebError,
     },
@@ -31,6 +33,8 @@ struct AuthPageProps {
     errors: ValidationErrors,
     csrf_token: String,
     status: Option<String>,
+    #[serde(rename = "passwordRules", skip_serializing_if = "Option::is_none")]
+    password_rules: Option<&'static str>,
 }
 
 #[derive(Serialize)]
@@ -48,7 +52,7 @@ struct DashboardAuth {
 struct LoginInput {
     #[validate(email, length(max = 255))]
     email: String,
-    #[validate(length(min = 1, max = 1024))]
+    #[validate(length(min = 1))]
     password: String,
 }
 
@@ -58,7 +62,7 @@ struct RegistrationInput {
     name: String,
     #[validate(email, length(max = 255))]
     email: String,
-    #[validate(length(min = 8, max = 1024))]
+    #[validate(length(min = 8))]
     password: String,
     password_confirmation: String,
 }
@@ -79,7 +83,7 @@ async fn login(
     if auth.user.is_some() {
         return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
     }
-    render_auth_page(frontend, auth, request, LOGIN_COMPONENT).await
+    render_auth_page(frontend, auth, request, LOGIN_COMPONENT, false).await
 }
 
 async fn register(
@@ -90,7 +94,7 @@ async fn register(
     if auth.user.is_some() {
         return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
     }
-    render_auth_page(frontend, auth, request, REGISTER_COMPONENT).await
+    render_auth_page(frontend, auth, request, REGISTER_COMPONENT, true).await
 }
 
 async fn render_auth_page(
@@ -98,6 +102,7 @@ async fn render_auth_page(
     auth: AuthSession,
     request: InertiaRequest,
     component: &'static str,
+    include_password_rules: bool,
 ) -> Result<Response, WebError> {
     let csrf_token = get_or_create_token(&auth.session)
         .await
@@ -115,6 +120,7 @@ async fn render_auth_page(
                 errors,
                 csrf_token,
                 status,
+                password_rules: include_password_rules.then(|| auth.backend.password_rules()),
             },
         ),
         move |context| frontend.document(context),
@@ -137,17 +143,19 @@ async fn store_login(
         }
         Err(ValidationRejection::Inner(error)) => return Ok(error.into_response()),
     };
-    let key = LoginRateLimiter::key(&input.email, address.ip());
-    if auth.backend.too_many_login_attempts(&key).await {
-        return redirect_with_error(
-            &auth,
-            &request,
-            "email",
-            "Too many login attempts. Please try again in 60 seconds.",
-            "/login",
-        )
-        .await;
+    if auth.user.is_some() {
+        return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
     }
+    let key = LoginRateLimiter::key(&input.email, address.ip());
+    let remaining = match auth.backend.login_attempt(&key).await {
+        RateLimitOutcome::Allowed { remaining } => remaining,
+        RateLimitOutcome::Limited { retry_after } => {
+            return Ok(rate_limit::too_many_attempts(
+                LOGIN_ATTEMPTS_PER_MINUTE,
+                retry_after,
+            ));
+        }
+    };
     let user = auth
         .authenticate(Credentials {
             email: input.email,
@@ -156,11 +164,14 @@ async fn store_login(
         .await?;
     let Some(user) = user else {
         tracing::warn!("authentication failed");
-        return invalid_credentials(&auth, &request).await;
+        let mut response = invalid_credentials(&auth, &request).await?;
+        rate_limit::add_headers(&mut response, LOGIN_ATTEMPTS_PER_MINUTE, remaining, None);
+        return Ok(response);
     };
-    auth.backend.clear_login_attempts(&key).await;
     auth.login(&user).await?;
-    Ok(request.redirect(Inertia::redirect("/dashboard"))?)
+    let mut response = request.redirect(Inertia::redirect("/dashboard"))?;
+    rate_limit::add_headers(&mut response, LOGIN_ATTEMPTS_PER_MINUTE, remaining, None);
+    Ok(response)
 }
 
 async fn invalid_credentials(
@@ -185,6 +196,9 @@ async fn store_registration(
         ValidationRejection<ValidatorInputErrors, JsonRejection>,
     >,
 ) -> Result<Response, WebError> {
+    if auth.user.is_some() {
+        return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
+    }
     let input = match input {
         Ok(Valid(Json(input))) => input,
         Err(ValidationRejection::Valid(validation)) => {
@@ -198,6 +212,16 @@ async fn store_registration(
     if !errors.is_empty() {
         auth.session.insert(FLASH_ERRORS, errors).await?;
         return Ok(request.redirect(Inertia::redirect("/register"))?);
+    }
+    if let Err(violation) = auth.backend.validate_password(&input.password) {
+        return redirect_with_error(
+            &auth,
+            &request,
+            "password",
+            &violation.message(),
+            "/register",
+        )
+        .await;
     }
     let user = match auth
         .backend
@@ -227,6 +251,9 @@ async fn store_registration(
 }
 
 async fn logout(mut auth: AuthSession, request: InertiaRequest) -> Result<Response, WebError> {
+    if auth.user.is_none() {
+        return Ok(request.redirect(Inertia::redirect("/login"))?);
+    }
     auth.logout().await?;
     Ok(request.redirect(Inertia::redirect("/"))?)
 }
