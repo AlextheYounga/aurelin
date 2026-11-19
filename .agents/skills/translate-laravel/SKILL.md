@@ -12,14 +12,16 @@ Treat Laravel as the behavioral reference and Rust as the implementation languag
 Before designing or writing feature code:
 
 1. Read the relevant sections of `CONTEXT.md` and identify the Laravel version Aurelin targets.
-2. Locate the authoritative Laravel implementation for the requested capability. Inspect, as applicable:
+2. Load `place-aurelin-code` and complete its placement gate before editing any
+   package, CLI, generated-application, or starter file.
+3. Locate the authoritative Laravel implementation for the requested capability. Inspect, as applicable:
    - Laravel documentation;
    - framework or first-party package source;
    - upstream tests;
    - default configuration, migrations, and generated files;
    - official Vue or React starter-kit code.
-3. Distinguish framework defaults from optional packages, configurable behavior, starter-kit behavior, and application-specific examples.
-4. Identify the Composer package that owns the behavior and its public integration boundary. Do not infer ownership from the starter file that calls it.
+4. Distinguish framework defaults from optional packages, configurable behavior, starter-kit behavior, and application-specific examples.
+5. Identify the Composer package that owns the behavior and its public integration boundary. Do not infer ownership from the starter file that calls it.
 
 Do not implement from memory, a third-party tutorial, or a Laravel-shaped API guess. Documentation describes the contract, but inspect source and tests whenever sequence, defaults, edge cases, or extension behavior matter.
 
