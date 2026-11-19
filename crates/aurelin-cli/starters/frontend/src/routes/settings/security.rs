@@ -11,11 +11,11 @@ use crate::{
     frontend::Frontend,
     frontend_config::SECURITY_SETTINGS_COMPONENT,
     routes::{
-        password_confirmation::{PASSWORD_CONFIRMATION_REDIRECT, password_is_confirmed},
         session_feedback::{FLASH_STATUS, ValidationErrors},
         web_error::WebError,
     },
 };
+use aurelin_fortify::axum::{PASSWORD_CONFIRMATION_REDIRECT, password_is_confirmed};
 
 #[derive(Serialize)]
 struct SecurityProps {

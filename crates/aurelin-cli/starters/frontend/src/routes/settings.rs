@@ -1,3 +1,4 @@
+use aurelin_framework::http as rate_limit;
 use aurelin_framework::{
     auth::RateLimitOutcome,
     axum::{
@@ -18,7 +19,6 @@ use crate::{
     frontend::Frontend,
     frontend_config::PROFILE_SETTINGS_COMPONENT,
     routes::{
-        rate_limit,
         session_feedback::{FLASH_ERRORS, FLASH_STATUS, ValidationErrors, redirect_with_error},
         web_error::WebError,
     },
@@ -279,7 +279,7 @@ async fn update_password(
 }
 
 fn with_password_update_rate_limit(mut response: Response, remaining: u32) -> Response {
-    rate_limit::add_headers(
+    rate_limit::add_rate_limit_headers(
         &mut response,
         PASSWORD_UPDATE_ATTEMPTS_PER_MINUTE,
         remaining,

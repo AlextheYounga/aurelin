@@ -6,7 +6,25 @@ use axum_login::AuthManagerLayerBuilder;
 use axum_tower_sessions_csrf::CsrfMiddleware;
 use tower_sessions_sqlx_store::SqliteStore;
 
-use crate::{auth::AuthBackend, frontend::Frontend, mail::Mailer};
+use aurelin_framework::mail::Mailer;
+use std::time::Duration;
+
+use crate::{auth::AuthBackend, frontend::Frontend};
+
+pub struct ApplicationOptions {
+    pub mailer: Mailer,
+    pub authentication_timebox_duration: Duration,
+}
+
+impl Default for ApplicationOptions {
+    fn default() -> Self {
+        Self {
+            mailer: Mailer::log(),
+            authentication_timebox_duration:
+                aurelin_fortify::axum::DEFAULT_AUTHENTICATION_TIMEBOX_DURATION,
+        }
+    }
+}
 
 /// Compose routes, application state, and middleware here.
 pub async fn application(
@@ -17,14 +35,14 @@ pub async fn application(
     application_environment: &str,
     application_url: &str,
 ) -> Result<Router, Box<dyn std::error::Error>> {
-    application_with_mailer(
+    application_with_options(
         frontend,
         database_url,
         secure_cookie,
         application_key,
         application_environment,
         application_url,
-        Mailer::log(),
+        ApplicationOptions::default(),
     )
     .await
 }
@@ -37,6 +55,30 @@ pub async fn application_with_mailer(
     application_environment: &str,
     application_url: &str,
     mailer: Mailer,
+) -> Result<Router, Box<dyn std::error::Error>> {
+    application_with_options(
+        frontend,
+        database_url,
+        secure_cookie,
+        application_key,
+        application_environment,
+        application_url,
+        ApplicationOptions {
+            mailer,
+            ..ApplicationOptions::default()
+        },
+    )
+    .await
+}
+
+pub async fn application_with_options(
+    frontend: Frontend,
+    database_url: &str,
+    secure_cookie: bool,
+    application_key: &[u8],
+    application_environment: &str,
+    application_url: &str,
+    options: ApplicationOptions,
 ) -> Result<Router, Box<dyn std::error::Error>> {
     let version = frontend.version();
     let database = crate::database::connect(database_url).await?;
@@ -53,22 +95,18 @@ pub async fn application_with_mailer(
             application_key,
             application_environment,
             application_url,
-            mailer,
+            options.mailer,
         )
-        .await?,
+        .await?
+        .with_authentication_timebox_duration(options.authentication_timebox_duration),
         session_layer,
     )
     .build();
 
     Ok(Router::new()
         .merge(crate::routes::http::routes())
-        .merge(crate::routes::authentication::routes())
-        .merge(crate::routes::email_verification::routes())
-        .merge(crate::routes::password_reset::routes())
-        .merge(crate::routes::password_confirmation::routes())
-        .merge(crate::routes::passkeys::routes())
+        .merge(aurelin_fortify::axum::routes::<Frontend, AuthBackend>())
         .merge(crate::routes::settings::routes())
-        .merge(crate::routes::two_factor_authentication::routes())
         .nest("/build", frontend.asset_routes())
         .layer(VersionLayer::new(version))
         .layer(middleware::from_fn(CsrfMiddleware::middleware))

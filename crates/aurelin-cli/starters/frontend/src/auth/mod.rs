@@ -15,6 +15,7 @@ use aurelin_framework::auth::{
     PasswordResetCredentials, PasswordResetError, PasswordResetRepository, PasswordResetRequest,
     RateLimitOutcome, StoredPasswordResetToken,
 };
+use aurelin_framework::mail::{MailError, Mailer};
 use axum_login::{AuthUser, AuthnBackend, UserId};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
@@ -28,13 +29,13 @@ use crate::{
         CreateNewUser, CreateNewUserError, CreateUser, ResetUserPassword, ResetUserPasswordError,
     },
     entities::{password_reset_token, user},
-    mail::{MailError, Mailer},
     password_policy::{PasswordPolicy, PasswordPolicyViolation},
 };
 
 pub type AuthSession = axum_login::AuthSession<AuthBackend>;
 pub type User = user::Model;
 
+mod fortify;
 mod notifications;
 mod passkeys;
 mod settings;
@@ -73,11 +74,7 @@ impl AuthUser for User {
     }
 }
 
-#[derive(Clone)]
-pub struct Credentials {
-    pub email: String,
-    pub password: String,
-}
+pub use aurelin_fortify::axum::Credentials;
 
 #[derive(Clone, Debug)]
 pub struct AuthBackend {
@@ -85,6 +82,7 @@ pub struct AuthBackend {
     dummy_password_hash: Arc<String>,
     passwords: BcryptPasswordHasher,
     attempts: LoginRateLimiter,
+    authentication_timebox_duration: Duration,
     password_reset_tokens: PasswordResetBroker<AuthRepository>,
     reset_passwords: ResetPasswords<AuthRepository, ResetUserPassword>,
     create_new_user: CreateNewUser,
@@ -135,7 +133,14 @@ impl AuthBackend {
             dummy_password_hash: Arc::new(dummy_password_hash),
             passwords,
             attempts: LoginRateLimiter::default(),
+            authentication_timebox_duration:
+                aurelin_fortify::axum::DEFAULT_AUTHENTICATION_TIMEBOX_DURATION,
         })
+    }
+
+    pub fn with_authentication_timebox_duration(mut self, duration: Duration) -> Self {
+        self.authentication_timebox_duration = duration;
+        self
     }
 
     pub async fn create_user(
@@ -154,8 +159,16 @@ impl AuthBackend {
             .await?)
     }
 
-    pub async fn login_attempt(&self, key: &str) -> RateLimitOutcome {
+    pub async fn login_retry_after(&self, key: &str) -> Option<Duration> {
+        self.attempts.retry_after(key).await
+    }
+
+    pub async fn record_failed_login(&self, key: &str) -> RateLimitOutcome {
         self.attempts.attempt(key).await
+    }
+
+    pub async fn clear_failed_logins(&self, key: &str) {
+        self.attempts.clear(key).await;
     }
 
     pub async fn validate_password(&self, password: &str) -> Result<(), PasswordPolicyViolation> {
@@ -265,8 +278,19 @@ impl AuthnBackend for AuthBackend {
                 |user| user.password_hash.as_str(),
             )
             .to_owned();
-        let password_matches = self.passwords.verify(&credentials.password, &hash).await?;
-        Ok(user.filter(|_| password_matches))
+        if !self.passwords.verify(&credentials.password, &hash).await? {
+            return Ok(None);
+        }
+        let Some(user) = user else {
+            return Ok(None);
+        };
+        if !self.passwords.needs_rehash(&user.password_hash)? {
+            return Ok(Some(user));
+        }
+        let mut active: user::ActiveModel = user.into();
+        active.password_hash = Set(self.passwords.hash(&credentials.password).await?);
+        active.updated_at = Set(unix_timestamp()?);
+        Ok(Some(active.update(&self.database).await?))
     }
 
     async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {

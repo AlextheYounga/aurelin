@@ -1,4 +1,8 @@
-use std::{error::Error, net::SocketAddr};
+use std::{
+    error::Error,
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 
 use aurelin_framework::axum::{
     body::{Body, to_bytes},
@@ -277,6 +281,60 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
         .await?;
     assert_eq!(guest_logout.status(), StatusCode::SEE_OTHER);
     assert_eq!(guest_logout.headers()[header::LOCATION], "/login");
+
+    let failed_before_success = app
+        .clone()
+        .oneshot(request(
+            Method::POST,
+            "/login",
+            Some(&login_cookie),
+            Some(&login_csrf),
+            Some(r#"{"email":"ada@example.com","password":"wrong-password"}"#),
+        )?)
+        .await?;
+    assert_eq!(
+        failed_before_success.headers()["x-ratelimit-remaining"],
+        "4"
+    );
+    let successful_login = app
+        .clone()
+        .oneshot(request(
+            Method::POST,
+            "/login",
+            Some(&login_cookie),
+            Some(&login_csrf),
+            Some(r#"{"email":"ada@example.com","password":"correct-horse"}"#),
+        )?)
+        .await?;
+    assert_eq!(successful_login.headers()[header::LOCATION], "/dashboard");
+    let successful_login_cookie = session_cookie(&successful_login)?;
+    let verification = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            "/email/verify",
+            Some(&successful_login_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    let successful_login_csrf = csrf_token(verification).await?;
+    app.clone()
+        .oneshot(request(
+            Method::POST,
+            "/logout",
+            Some(&successful_login_cookie),
+            Some(&successful_login_csrf),
+            Some("{}"),
+        )?)
+        .await?;
+    let login_page = app
+        .clone()
+        .oneshot(request(Method::GET, "/login", None, None, None)?)
+        .await?;
+    let login_cookie = session_cookie(&login_page)?;
+    let login_csrf = csrf_token(login_page).await?;
+
     for remaining in (0..5).rev() {
         let failed = app
             .clone()
@@ -309,6 +367,102 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
     assert_eq!(throttled.headers()["x-ratelimit-remaining"], "0");
     assert!(throttled.headers().contains_key(header::RETRY_AFTER));
     assert!(throttled.headers().contains_key("x-ratelimit-reset"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn failed_credentials_are_timeboxed_while_successful_credentials_return_early()
+-> Result<(), Box<dyn Error>> {
+    let minimum_duration = Duration::from_secs(2);
+    let app = __AURELIN_CRATE__::bootstrap::application_with_options(
+        Frontend::new(),
+        "sqlite::memory:",
+        false,
+        b"test-key",
+        "local",
+        "http://localhost:8000",
+        __AURELIN_CRATE__::bootstrap::ApplicationOptions {
+            mailer: aurelin_framework::mail::Mailer::log(),
+            authentication_timebox_duration: minimum_duration,
+        },
+    )
+    .await?;
+    let register_page = app
+        .clone()
+        .oneshot(request(Method::GET, "/register", None, None, None)?)
+        .await?;
+    let cookie = session_cookie(&register_page)?;
+    let csrf = csrf_token(register_page).await?;
+    let registered = app
+        .clone()
+        .oneshot(request(
+            Method::POST,
+            "/register",
+            Some(&cookie),
+            Some(&csrf),
+            Some(registration_json()),
+        )?)
+        .await?;
+    let authenticated_cookie = session_cookie(&registered)?;
+    let verification_page = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            "/email/verify",
+            Some(&authenticated_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    let authenticated_csrf = csrf_token(verification_page).await?;
+    app.clone()
+        .oneshot(request(
+            Method::POST,
+            "/logout",
+            Some(&authenticated_cookie),
+            Some(&authenticated_csrf),
+            Some("{}"),
+        )?)
+        .await?;
+    let login_page = app
+        .clone()
+        .oneshot(request(Method::GET, "/login", None, None, None)?)
+        .await?;
+    let cookie = session_cookie(&login_page)?;
+    let csrf = csrf_token(login_page).await?;
+
+    for body in [
+        r#"{"email":"unknown@example.com","password":"wrong-password"}"#,
+        r#"{"email":"ada@example.com","password":"wrong-password"}"#,
+    ] {
+        let started_at = Instant::now();
+        let response = app
+            .clone()
+            .oneshot(request(
+                Method::POST,
+                "/login",
+                Some(&cookie),
+                Some(&csrf),
+                Some(body),
+            )?)
+            .await?;
+
+        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert!(started_at.elapsed() >= minimum_duration);
+    }
+
+    let started_at = Instant::now();
+    let authenticated = app
+        .oneshot(request(
+            Method::POST,
+            "/login",
+            Some(&cookie),
+            Some(&csrf),
+            Some(r#"{"email":"ada@example.com","password":"correct-horse"}"#),
+        )?)
+        .await?;
+    assert_eq!(authenticated.headers()[header::LOCATION], "/dashboard");
+    assert!(started_at.elapsed() < minimum_duration);
     Ok(())
 }
 

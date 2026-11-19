@@ -16,6 +16,8 @@ pub(super) enum WebError {
     Auth(#[from] AuthError),
     #[error(transparent)]
     AuthSession(#[from] axum_login::Error<AuthBackend>),
+    #[error(transparent)]
+    Fortify(#[from] aurelin_fortify::axum::FortifyHttpError),
     #[error("CSRF session operation failed: {0}")]
     Csrf(String),
     #[error(transparent)]

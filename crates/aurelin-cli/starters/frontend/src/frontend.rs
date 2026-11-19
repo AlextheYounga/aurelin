@@ -7,6 +7,12 @@ use aurelin_framework::{
 };
 use vite_rs_axum_0_8::ViteServe;
 
+use crate::frontend_config::{
+    CONFIRM_PASSWORD_COMPONENT, DASHBOARD_COMPONENT, FORGOT_PASSWORD_COMPONENT, LOGIN_COMPONENT,
+    REGISTER_COMPONENT, RESET_PASSWORD_COMPONENT, TWO_FACTOR_CHALLENGE_COMPONENT,
+    VERIFY_EMAIL_COMPONENT,
+};
+
 #[cfg(debug_assertions)]
 use crate::frontend_config::{DEV_SCRIPT, FRAMEWORK};
 
@@ -53,6 +59,25 @@ impl Frontend {
 
     #[cfg(not(debug_assertions))]
     pub fn start_dev_server(&self) {}
+}
+
+impl aurelin_fortify::axum::FortifyFrontend for Frontend {
+    fn fortify_components(&self) -> aurelin_fortify::axum::FortifyComponents {
+        aurelin_fortify::axum::FortifyComponents {
+            dashboard: DASHBOARD_COMPONENT,
+            login: LOGIN_COMPONENT,
+            register: REGISTER_COMPONENT,
+            forgot_password: FORGOT_PASSWORD_COMPONENT,
+            reset_password: RESET_PASSWORD_COMPONENT,
+            confirm_password: CONFIRM_PASSWORD_COMPONENT,
+            verify_email: VERIFY_EMAIL_COMPONENT,
+            two_factor_challenge: TWO_FACTOR_CHALLENGE_COMPONENT,
+        }
+    }
+
+    fn fortify_document(&self, context: HtmlResponseContext) -> Html<String> {
+        self.document(context)
+    }
 }
 
 #[cfg(debug_assertions)]

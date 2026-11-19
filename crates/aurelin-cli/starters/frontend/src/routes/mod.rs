@@ -1,12 +1,4 @@
-pub mod authentication;
-pub mod email_verification;
 pub mod http;
-mod login_session;
-pub mod passkeys;
-pub mod password_confirmation;
-pub mod password_reset;
-mod rate_limit;
 mod session_feedback;
 pub mod settings;
-pub mod two_factor_authentication;
 mod web_error;

@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use __AURELIN_CRATE__::mail::Mailer;
+use aurelin_framework::mail::Mailer;
 
 #[tokio::test]
 async fn smtp_mailer_delivers_a_message_to_the_configured_server() -> Result<(), Box<dyn Error>> {

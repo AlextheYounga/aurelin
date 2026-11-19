@@ -1,24 +1,36 @@
-use std::{error::Error, net::SocketAddr};
+use std::{
+    error::Error,
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 
 use aurelin_framework::axum::{
     body::{Body, to_bytes},
     extract::ConnectInfo,
     http::{Method, Request, Response, StatusCode, header},
 };
-use __AURELIN_CRATE__::{bootstrap::application, frontend::Frontend};
+use __AURELIN_CRATE__::{
+    bootstrap::{ApplicationOptions, application_with_options},
+    frontend::Frontend,
+};
 use totp_rs::{Builder, Secret};
 use tower::ServiceExt;
 
 #[tokio::test]
 async fn confirmed_two_factor_setup_requires_a_code_or_single_use_recovery_code_at_login()
 -> Result<(), Box<dyn Error>> {
-    let app = application(
+    let authentication_timebox_duration = Duration::from_secs(2);
+    let app = application_with_options(
         Frontend::new(),
         "sqlite::memory:",
         false,
         b"test-key",
         "local",
         "http://localhost:8000",
+        ApplicationOptions {
+            mailer: aurelin_framework::mail::Mailer::log(),
+            authentication_timebox_duration,
+        },
     )
     .await?;
     let register_page = app
@@ -138,6 +150,7 @@ async fn confirmed_two_factor_setup_requires_a_code_or_single_use_recovery_code_
         .await?;
     let login_cookie = session_cookie(&login_page)?;
     let login_csrf = csrf_token(login_page).await?;
+    let login_started_at = Instant::now();
     let password_accepted = app
         .clone()
         .oneshot(request(
@@ -153,6 +166,7 @@ async fn confirmed_two_factor_setup_requires_a_code_or_single_use_recovery_code_
         password_accepted.headers()[header::LOCATION],
         "/two-factor-challenge"
     );
+    assert!(login_started_at.elapsed() < authentication_timebox_duration);
 
     for remaining in (1..5).rev() {
         let invalid = app
