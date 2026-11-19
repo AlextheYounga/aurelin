@@ -17,6 +17,7 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
         false,
         b"test-key",
         "local",
+        "http://localhost:8000",
     )
     .await?;
     let register_page = app

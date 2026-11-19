@@ -5,7 +5,11 @@ edition = "2024"
 
 [dependencies]
 aurelin-framework = { path = "../aurelin-framework" }
+aurelin-passkeys = { path = "../aurelin-passkeys" }
+constant_time_eq = "0.4"
+rand = "0.9"
 thiserror = "2"
+totp-rs = { version = "6.0", features = ["gen_secret", "otpauth", "qr", "zeroize"] }
 
 [lints]
 workspace = true

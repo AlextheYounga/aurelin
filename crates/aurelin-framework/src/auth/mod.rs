@@ -1,3 +1,5 @@
+mod compromised_password;
+mod encryption;
 mod password;
 mod password_reset;
 mod rate_limit;
@@ -14,3 +16,5 @@ pub fn digest_token(token: &str) -> String {
 
     format!("{:x}", Sha256::digest(token.as_bytes()))
 }
+pub use compromised_password::CompromisedPasswordChecker;
+pub use encryption::{ApplicationEncrypter, EncryptionError};

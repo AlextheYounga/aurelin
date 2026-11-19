@@ -8,3 +8,6 @@ pub const FORGOT_PASSWORD_COMPONENT: &str = "auth/ForgotPassword";
 pub const RESET_PASSWORD_COMPONENT: &str = "auth/ResetPassword";
 pub const CONFIRM_PASSWORD_COMPONENT: &str = "auth/ConfirmPassword";
 pub const VERIFY_EMAIL_COMPONENT: &str = "auth/VerifyEmail";
+pub const TWO_FACTOR_CHALLENGE_COMPONENT: &str = "auth/TwoFactorChallenge";
+pub const TWO_FACTOR_SETTINGS_COMPONENT: &str = "settings/TwoFactor";
+pub const PASSKEY_SETTINGS_COMPONENT: &str = "settings/Passkeys";

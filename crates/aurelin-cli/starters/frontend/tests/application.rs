@@ -19,6 +19,7 @@ async fn initial_visit_contains_the_inertia_page_and_vite_entry() -> Result<(), 
         false,
         b"test-key",
         "local",
+        "http://localhost:8000",
     )
     .await?
     .oneshot(Request::builder().uri("/").body(Body::empty())?)
@@ -35,16 +36,23 @@ async fn initial_visit_contains_the_inertia_page_and_vite_entry() -> Result<(), 
 async fn inertia_visit_returns_json_for_the_same_component() -> Result<(), Box<dyn Error>> {
     let frontend = Frontend::new();
     let version = frontend.version().to_owned();
-    let response = application(frontend, "sqlite::memory:", false, b"test-key", "local")
-        .await?
-        .oneshot(
-            Request::builder()
-                .uri("/")
-                .header("X-Inertia", "true")
-                .header("X-Inertia-Version", version)
-                .body(Body::empty())?,
-        )
-        .await?;
+    let response = application(
+        frontend,
+        "sqlite::memory:",
+        false,
+        b"test-key",
+        "local",
+        "http://localhost:8000",
+    )
+    .await?
+    .oneshot(
+        Request::builder()
+            .uri("/")
+            .header("X-Inertia", "true")
+            .header("X-Inertia-Version", version)
+            .body(Body::empty())?,
+    )
+    .await?;
     assert_eq!(response.status(), StatusCode::OK);
     let body: serde_json::Value =
         serde_json::from_slice(&to_bytes(response.into_body(), usize::MAX).await?)?;

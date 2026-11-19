@@ -1,11 +1,20 @@
 use std::{error::Error, net::SocketAddr};
 
+use aurelin_framework::auth::CompromisedPasswordChecker;
 use aurelin_framework::axum::{
+    Router,
     body::{Body, to_bytes},
     extract::ConnectInfo,
-    http::{Method, Request, Response, StatusCode, header},
+    http::{HeaderMap, Method, Request, Response, StatusCode, header},
+    routing::get,
+    serve,
 };
-use __AURELIN_CRATE__::{bootstrap::application, frontend::Frontend};
+use __AURELIN_CRATE__::{
+    bootstrap::application,
+    frontend::Frontend,
+    password_policy::{PasswordPolicy, PasswordPolicyViolation},
+};
+use tokio::net::TcpListener;
 use tower::ServiceExt;
 
 #[tokio::test]
@@ -17,6 +26,7 @@ async fn production_registration_requires_laravels_local_password_rules()
         false,
         b"test-key",
         "production",
+        "http://localhost:8000",
     )
     .await?;
     let register_page = app
@@ -51,21 +61,42 @@ async fn production_registration_requires_laravels_local_password_rules()
             None,
         )?)
         .await?;
-    let csrf = csrf_token_and_assert_error(register_page).await?;
-    let registered = app
-        .oneshot(request(
-            Method::POST,
-            "/register",
-            Some(&cookie),
-            Some(&csrf),
-            Some(
-                r#"{"name":"Ada Lovelace","email":"ada@example.com","password":"Correct-Horse-1","password_confirmation":"Correct-Horse-1"}"#,
-            ),
-        )?)
-        .await?;
-    assert_eq!(registered.status(), StatusCode::SEE_OTHER);
-    assert_eq!(registered.headers()[header::LOCATION], "/dashboard");
+    assert_password_policy_error(register_page).await?;
     Ok(())
+}
+
+#[tokio::test]
+async fn production_rejects_compromised_passwords_and_accepts_clean_passwords()
+-> Result<(), Box<dyn Error>> {
+    let listener = TcpListener::bind("127.0.0.1:0").await?;
+    let address = listener.local_addr()?;
+    let server = Router::new().route("/{prefix}", get(hibp_range));
+    let _server = tokio::spawn(async move { serve(listener, server).await });
+    let policy = PasswordPolicy::with_compromised_password_checker(
+        "production",
+        CompromisedPasswordChecker::for_endpoint(format!("http://{address}")),
+    );
+
+    assert_eq!(
+        policy.validate("Compromised-1!").await,
+        Err(PasswordPolicyViolation::Compromised)
+    );
+    assert_eq!(policy.validate("Uncompromised-1!").await, Ok(()));
+    Ok(())
+}
+
+async fn hibp_range(headers: HeaderMap) -> (StatusCode, &'static str) {
+    if headers
+        .get("add-padding")
+        .and_then(|value| value.to_str().ok())
+        != Some("true")
+    {
+        return (StatusCode::BAD_REQUEST, "");
+    }
+    (
+        StatusCode::OK,
+        "40FCDB5DF35B1118285478DED924654A4B8:4\r\n00000000000000000000000000000000000:0",
+    )
 }
 
 fn request(
@@ -104,10 +135,10 @@ async fn csrf_token(response: Response<Body>) -> Result<String, Box<dyn Error>> 
     )
 }
 
-async fn csrf_token_and_assert_error(response: Response<Body>) -> Result<String, Box<dyn Error>> {
+async fn assert_password_policy_error(response: Response<Body>) -> Result<(), Box<dyn Error>> {
     let body = String::from_utf8(to_bytes(response.into_body(), usize::MAX).await?.to_vec())?;
     assert!(body.contains("uppercase and one lowercase"));
-    csrf_token_from_body(&body)
+    Ok(())
 }
 
 fn csrf_token_from_body(body: &str) -> Result<String, Box<dyn Error>> {

@@ -224,7 +224,7 @@ async fn store_reset_password(
         )
         .await;
     }
-    if let Err(violation) = auth.backend.validate_password(&input.password) {
+    if let Err(violation) = auth.backend.validate_password(&input.password).await {
         return redirect_with_error(
             &auth,
             &request,

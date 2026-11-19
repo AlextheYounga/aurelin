@@ -25,8 +25,19 @@ use crate::{
     },
 };
 
-const PASSWORD_CONFIRMED_AT: &str = "auth.password_confirmed_at";
+pub(super) const PASSWORD_CONFIRMED_AT: &str = "auth.password_confirmed_at";
+pub(super) const PASSWORD_CONFIRMATION_REDIRECT: &str = "auth.password_confirmation_redirect";
 const DEFAULT_PASSWORD_TIMEOUT_SECONDS: u64 = 10_800;
+
+pub(super) async fn password_is_confirmed(auth: &AuthSession) -> Result<bool, WebError> {
+    let confirmed_at = auth
+        .session
+        .get::<u64>(PASSWORD_CONFIRMED_AT)
+        .await?
+        .unwrap_or_default();
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    Ok(now.saturating_sub(confirmed_at) < DEFAULT_PASSWORD_TIMEOUT_SECONDS)
+}
 
 #[derive(Serialize)]
 struct ConfirmPasswordProps {
@@ -157,5 +168,10 @@ async fn store_password_confirmation(
     auth.session
         .insert(PASSWORD_CONFIRMED_AT, confirmed_at)
         .await?;
-    Ok(request.redirect(Inertia::redirect("/dashboard"))?)
+    let destination = auth
+        .session
+        .remove::<String>(PASSWORD_CONFIRMATION_REDIRECT)
+        .await?
+        .unwrap_or_else(|| "/dashboard".into());
+    Ok(request.redirect(Inertia::redirect(&destination))?)
 }

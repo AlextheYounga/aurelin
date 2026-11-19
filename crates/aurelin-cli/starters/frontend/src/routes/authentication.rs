@@ -168,6 +168,12 @@ async fn store_login(
         rate_limit::add_headers(&mut response, LOGIN_ATTEMPTS_PER_MINUTE, remaining, None);
         return Ok(response);
     };
+    if user.two_factor_secret.is_some() && user.two_factor_confirmed_at.is_some() {
+        auth.session.insert("login.id", user.id).await?;
+        let mut response = request.redirect(Inertia::redirect("/two-factor-challenge"))?;
+        rate_limit::add_headers(&mut response, LOGIN_ATTEMPTS_PER_MINUTE, remaining, None);
+        return Ok(response);
+    }
     auth.login(&user).await?;
     let mut response = request.redirect(Inertia::redirect("/dashboard"))?;
     rate_limit::add_headers(&mut response, LOGIN_ATTEMPTS_PER_MINUTE, remaining, None);
@@ -213,7 +219,7 @@ async fn store_registration(
         auth.session.insert(FLASH_ERRORS, errors).await?;
         return Ok(request.redirect(Inertia::redirect("/register"))?);
     }
-    if let Err(violation) = auth.backend.validate_password(&input.password) {
+    if let Err(violation) = auth.backend.validate_password(&input.password).await {
         return redirect_with_error(
             &auth,
             &request,

@@ -29,7 +29,15 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     ));
     let database_url = format!("sqlite://{}?mode=rwc", database_path.display());
-    let app = application(Frontend::new(), &database_url, false, b"test-key", "local").await?;
+    let app = application(
+        Frontend::new(),
+        &database_url,
+        false,
+        b"test-key",
+        "local",
+        "http://localhost:8000",
+    )
+    .await?;
 
     let register_page = app
         .clone()

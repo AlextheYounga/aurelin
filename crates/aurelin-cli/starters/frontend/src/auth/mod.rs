@@ -6,7 +6,8 @@ use std::{
 use aurelin_fortify::{
     CreatesNewUsers, EmailVerification, EmailVerificationError, EmailVerificationRateLimiter,
     EmailVerificationRequest, LoginRateLimiter, RegistrationInput, ResetPasswords,
-    ResetPasswordsError,
+    ResetPasswordsError, TwoFactorAuthentication, TwoFactorError, TwoFactorRateLimiter,
+    passkeys::{PasskeyConfig, PasskeyError, Passkeys},
 };
 use aurelin_framework::auth::{
     BcryptPasswordHasher, PasswordHashError, PasswordResetBroker, PasswordResetCredentials,
@@ -31,6 +32,9 @@ use crate::{
 
 pub type AuthSession = axum_login::AuthSession<AuthBackend>;
 pub type User = user::Model;
+
+mod passkeys;
+mod two_factor;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct PublicUser {
@@ -71,7 +75,7 @@ pub struct Credentials {
 
 #[derive(Clone, Debug)]
 pub struct AuthBackend {
-    database: DatabaseConnection,
+    pub(super) database: DatabaseConnection,
     dummy_password_hash: Arc<String>,
     passwords: BcryptPasswordHasher,
     attempts: LoginRateLimiter,
@@ -81,6 +85,9 @@ pub struct AuthBackend {
     email_verification: EmailVerification,
     email_verification_attempts: EmailVerificationRateLimiter,
     password_policy: PasswordPolicy,
+    pub(super) two_factor: TwoFactorAuthentication,
+    pub(super) two_factor_attempts: TwoFactorRateLimiter,
+    pub(super) passkeys: Passkeys,
 }
 
 impl AuthBackend {
@@ -88,6 +95,7 @@ impl AuthBackend {
         database: DatabaseConnection,
         application_key: &[u8],
         application_environment: &str,
+        application_url: &str,
     ) -> Result<Self, AuthError> {
         let passwords = BcryptPasswordHasher::default();
         let dummy_password_hash = passwords.hash("aurelin-invalid-credentials").await?;
@@ -101,6 +109,13 @@ impl AuthBackend {
             email_verification: EmailVerification::new(application_key)?,
             email_verification_attempts: EmailVerificationRateLimiter::default(),
             password_policy: PasswordPolicy::for_environment(application_environment),
+            two_factor: TwoFactorAuthentication::new(application_key, "Aurelin")?,
+            two_factor_attempts: TwoFactorRateLimiter::default(),
+            passkeys: Passkeys::new(PasskeyConfig::for_origin(
+                "Aurelin",
+                application_url,
+                application_key,
+            )?)?,
             database,
             dummy_password_hash: Arc::new(dummy_password_hash),
             passwords,
@@ -128,8 +143,8 @@ impl AuthBackend {
         self.attempts.attempt(key).await
     }
 
-    pub fn validate_password(&self, password: &str) -> Result<(), PasswordPolicyViolation> {
-        self.password_policy.validate(password)
+    pub async fn validate_password(&self, password: &str) -> Result<(), PasswordPolicyViolation> {
+        self.password_policy.validate(password).await
     }
 
     pub fn password_rules(&self) -> &'static str {
@@ -252,6 +267,14 @@ pub enum AuthError {
     CreateNewUser(#[from] CreateNewUserError),
     #[error(transparent)]
     EmailVerification(#[from] EmailVerificationError),
+    #[error(transparent)]
+    TwoFactor(#[from] TwoFactorError),
+    #[error(transparent)]
+    Passkey(#[from] PasskeyError),
+    #[error("this passkey is already registered")]
+    PasskeyAlreadyRegistered,
+    #[error("system clock produced an invalid timestamp")]
+    InvalidTimestamp,
     #[error("system clock is before the Unix epoch")]
     Clock(#[from] std::time::SystemTimeError),
 }
@@ -317,6 +340,6 @@ fn normalize_email(email: &str) -> String {
     email.to_lowercase()
 }
 
-fn unix_timestamp() -> Result<i64, std::time::SystemTimeError> {
+pub(super) fn unix_timestamp() -> Result<i64, std::time::SystemTimeError> {
     Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64)
 }

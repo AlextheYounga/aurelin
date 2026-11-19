@@ -12,6 +12,7 @@ aurelin/
 ├── crates/
 │   ├── aurelin-framework/       # Runtime integration and conventions
 │   ├── aurelin-fortify/         # Headless authentication package
+│   ├── aurelin-passkeys/        # WebAuthn ceremony integration
 │   └── aurelin-cli/             # Project generator and embedded starters
 │       └── starters/base/
 └── laravel -> ...            # Local Laravel source reference, not a dependency
@@ -104,14 +105,16 @@ Authentication follows Laravel's package boundary. `aurelin-framework` owns
 framework primitives: bcrypt hashing with Laravel's default cost, password
 reset token lifecycle, fixed-window rate limiting, temporary signed URLs, and
 Laravel-compatible session defaults. `aurelin-fortify` owns Fortify's
-application action contracts and login-rate-limit convention. Generated
+application action contracts, login-rate-limit convention, and TOTP workflow.
+`aurelin-passkeys` owns WebAuthn ceremonies behind Laravel's separate passkeys
+package boundary. Generated
 applications provide user persistence, migrations, action implementations,
 route/view selection, and frontend pages. The CLI only installs those packages
 and application-owned templates.
 
 Both frontend variants share registration, login, logout, protected dashboard,
-password-reset, email-verification, and password-confirmation routes and
-screens. SeaORM 1.1 provides application data access, SeaQuery-backed
+password-reset, email-verification, password-confirmation, two-factor, and
+passkey routes and screens. SeaORM 1.1 provides application data access, SeaQuery-backed
 `sea-orm-migration` owns the SQLite schema, and SQLx remains SeaORM's driver and
 the Tower session-store infrastructure. `axum-valid` integrates `validator`
 with Axum request extraction. `axum-login` 0.18 provides authenticated sessions
@@ -133,13 +136,21 @@ boundary for both views and submissions. Password confirmation uses Fortify's
 confirmation time in the session. Local and test environments require
 eight-character passwords. Production also requires 12 characters, mixed case,
 a number, and a symbol, and supplies the same browser `passwordrules` hints as
-the starter. Laravel's production `uncompromised` check is not yet implemented.
+the starter. Production also queries HIBP's padded range API with only the
+five-character SHA-1 prefix; lookup failures do not prevent password selection.
+
+Two-factor secrets and recovery codes use authenticated application-key
+encryption. The Fortify flow includes setup confirmation, QR and secret access,
+single-use recovery codes, TOTP replay rejection, and the five-per-minute login
+challenge limit. Passkeys use `webauthn-rs` for user-verified discoverable
+credentials, opaque application-specific user handles, server-held ceremony
+state, and persisted credential-counter updates. React and Vue call the official
+`@laravel/passkeys` client against Laravel's route contract.
 
 The current development notification path logs reset and verification URLs.
-Production mail delivery, confirmed-route freshness enforcement, two-factor
-authentication, passkeys, and remaining official starter behavior are not
+Production mail delivery and remaining official starter behavior are not yet
 implemented, so this remains a partial authentication starter rather than a
-parity claim.
+complete parity claim.
 
 Generated applications keep reusable behavior in a library target and a thin
 binary entry point. All Rust tests live in each crate's root `tests/` directory;

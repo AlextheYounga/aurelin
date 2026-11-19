@@ -11,6 +11,9 @@ pub struct Model {
     pub email_verified_at: Option<i64>,
     pub password_hash: String,
     pub remember_token: Option<String>,
+    pub two_factor_secret: Option<String>,
+    pub two_factor_recovery_codes: Option<String>,
+    pub two_factor_confirmed_at: Option<i64>,
     pub created_at: i64,
     pub updated_at: i64,
 }

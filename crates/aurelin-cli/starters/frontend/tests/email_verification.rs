@@ -22,6 +22,7 @@ async fn a_signed_link_verifies_the_authenticated_users_email() -> Result<(), Bo
         false,
         application_key,
         "local",
+        "http://localhost:8000",
     )
     .await?;
     let register_page = app

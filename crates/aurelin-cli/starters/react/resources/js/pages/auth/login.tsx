@@ -1,4 +1,6 @@
 import { Form, Head, Link } from '@inertiajs/react';
+import { Passkeys } from '@laravel/passkeys';
+import { useState } from 'react';
 
 type Props = {
     csrf_token: string;
@@ -7,6 +9,22 @@ type Props = {
 };
 
 export default function Login({ csrf_token, errors, status }: Props) {
+    const [passkeyError, setPasskeyError] = useState<string>();
+    const [verifying, setVerifying] = useState(false);
+
+    const verifyPasskey = async () => {
+        setVerifying(true);
+        setPasskeyError(undefined);
+        try {
+            Passkeys.configure({ fetch: { headers: { 'X-CSRF-TOKEN': csrf_token } } });
+            const response = await Passkeys.verify();
+            window.location.href = response.redirect ?? '/dashboard';
+        } catch (error) {
+            setPasskeyError(error instanceof Error ? error.message : 'The passkey could not be verified.');
+            setVerifying(false);
+        }
+    };
+
     return (
         <main>
             <Head title="Log in" />
@@ -16,7 +34,7 @@ export default function Login({ csrf_token, errors, status }: Props) {
                 {({ processing }) => (
                     <>
                         <label htmlFor="email">Email address</label>
-                        <input id="email" name="email" type="email" required autoFocus autoComplete="email" />
+                        <input id="email" name="email" type="email" required autoFocus autoComplete="email webauthn" />
                         {errors.email && <p role="alert">{errors.email}</p>}
 
                         <label htmlFor="password">Password</label>
@@ -28,6 +46,12 @@ export default function Login({ csrf_token, errors, status }: Props) {
                     </>
                 )}
             </Form>
+            {Passkeys.isSupported() && (
+                <button type="button" disabled={verifying} onClick={() => void verifyPasskey()}>
+                    Log in with a passkey
+                </button>
+            )}
+            {passkeyError && <p role="alert">{passkeyError}</p>}
             <p>Don't have an account? <Link href="/register">Sign up</Link></p>
         </main>
     );

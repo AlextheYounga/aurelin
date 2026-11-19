@@ -1,0 +1,19 @@
+[package]
+name = "aurelin-passkeys"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+base64 = "0.22"
+hmac = "0.12"
+rand = "0.9"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+url = "2"
+uuid = { version = "1", features = ["v4"] }
+webauthn-rs = { version = "0.6", features = ["conditional-ui"] }
+
+[lints]
+workspace = true

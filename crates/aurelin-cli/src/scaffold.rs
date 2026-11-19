@@ -128,6 +128,7 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
             dependency
         });
         dependencies["vite-rs-axum-0-8"] = value("0.3");
+        manifest["dev-dependencies"]["totp-rs"] = value("6.0");
     }
     let mut tower = InlineTable::new();
     tower.insert("version", "0.5".into());
@@ -149,6 +150,8 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
         path.join("tests/email_verification.rs"),
         path.join("tests/password_reset.rs"),
         path.join("tests/password_policy.rs"),
+        path.join("tests/passkeys.rs"),
+        path.join("tests/two_factor_authentication.rs"),
     ] {
         if !source.exists() {
             continue;

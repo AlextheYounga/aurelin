@@ -15,6 +15,7 @@ pub async fn application(
     secure_cookie: bool,
     application_key: &[u8],
     application_environment: &str,
+    application_url: &str,
 ) -> Result<Router, Box<dyn std::error::Error>> {
     let version = frontend.version();
     let database = crate::database::connect(database_url).await?;
@@ -26,7 +27,13 @@ pub async fn application(
         secure_cookie,
     );
     let auth_layer = AuthManagerLayerBuilder::new(
-        AuthBackend::new(database, application_key, application_environment).await?,
+        AuthBackend::new(
+            database,
+            application_key,
+            application_environment,
+            application_url,
+        )
+        .await?,
         session_layer,
     )
     .build();
@@ -37,6 +44,8 @@ pub async fn application(
         .merge(crate::routes::email_verification::routes())
         .merge(crate::routes::password_reset::routes())
         .merge(crate::routes::password_confirmation::routes())
+        .merge(crate::routes::passkeys::routes())
+        .merge(crate::routes::two_factor_authentication::routes())
         .nest("/build", frontend.asset_routes())
         .layer(VersionLayer::new(version))
         .layer(middleware::from_fn(CsrfMiddleware::middleware))
