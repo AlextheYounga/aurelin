@@ -7,6 +7,8 @@ Rust framework. Checked items are implemented and verified at the relevant
 public boundary. Unchecked items remain planned and do not imply a delivery
 date or a Laravel-wide parity claim.
 
+This roadmap tracks framework and application-development capabilities.
+
 ## Settled direction
 
 - [x] Use Laravel 13 as the behavioral reference.
@@ -34,9 +36,6 @@ date or a Laravel-wide parity claim.
 - [x] Shut down gracefully after Ctrl+C.
 - [x] Test generated applications through their compiled process and HTTP
       boundary.
-- [ ] Publish and version Aurelin crates.
-- [ ] Remove the temporary `--framework-path` requirement.
-- [ ] Define compatibility and upgrade policy for generated applications.
 - [ ] Add Laravel's health diagnostic event hook after an event dispatcher is
       available.
 - [ ] Add consistent Laravel-style HTTP error rendering.
@@ -65,8 +64,9 @@ date or a Laravel-wide parity claim.
       and signed URLs in `aurelin-framework`.
 - [x] Keep Fortify-equivalent workflows and contracts in `aurelin-fortify`.
 - [x] Keep WebAuthn ceremonies in `aurelin-passkeys`.
-- [x] Keep user persistence, migrations, actions, routes, and pages in the
-      generated application.
+- [x] Keep user persistence, migrations, actions, account-settings routes, and
+      pages in the generated application; mount Fortify-owned authentication
+      routes from `aurelin-fortify`.
 - [x] Hash passwords with Laravel's default bcrypt cost.
 - [x] Rotate session IDs after authentication.
 - [x] Protect state-changing requests with CSRF validation.
@@ -161,8 +161,6 @@ date or a Laravel-wide parity claim.
 - [x] Send mail through configurable SMTP using `lettre`.
 - [x] Support authenticated TLS, STARTTLS, and explicit unencrypted local SMTP.
 - [x] Test SMTP delivery through a controlled server boundary.
-- [ ] Add general application-facing mail composition and template conventions.
-- [ ] Integrate queued mail after the queue milestone exists.
 
 ### Authentication closeout
 
@@ -171,26 +169,35 @@ date or a Laravel-wide parity claim.
       confirmation to be individually omitted. All are currently installed,
       matching Laravel's default selection.
 - [ ] Implement and test feature-selective generation if it is approved.
-- [ ] Perform a final targeted comparison of routes, props, redirects,
+- [x] Perform a final targeted comparison of routes, props, redirects,
       validation responses, and security invariants against the pinned Laravel
       13 starter reference.
 - [ ] Map Laravel authentication events after Aurelin has an approved general
       event-dispatcher boundary.
-- [ ] Document every remaining auth difference as an intentional adaptation,
+- [x] Document every remaining auth difference found by the targeted comparison
+      as an intentional adaptation,
       deferred framework capability, or unresolved gap.
 
 ## 4. General application development
+
+### HTTP application structure
 
 - [ ] Define general routing conventions beyond the generated authentication
       application.
 - [ ] Define reusable middleware conventions and application registration.
 - [ ] Expand request validation and form-feedback behavior beyond auth flows.
 - [ ] Implement consistent application error responses.
+
+### Data and persistence
+
 - [ ] Define general SeaORM model, relationship, and query conventions.
 - [ ] Support application migrations outside the starter's auth schema.
 - [ ] Add database transactions and data-integrity conventions.
 - [ ] Add factories and seed data workflows.
 - [ ] Qualify supported database drivers beyond SQLite.
+
+### Authorization, configuration, and tooling
+
 - [ ] Implement authorization policies and route/action authorization.
 - [ ] Expand typed application and service configuration.
 - [ ] Add application-development and inspection commands to the CLI.
@@ -200,34 +207,42 @@ date or a Laravel-wide parity claim.
 Each service must begin with a verified Laravel 13 contract. A selected crate
 does not by itself complete a capability.
 
+### Events
+
+- [ ] Implement event dispatch and listener registration.
+- [ ] Define synchronous listener ordering and failure behavior.
+- [ ] Integrate queued listeners after the queue boundary exists.
+
+### Cache
+
 - [ ] Implement process-local and distributed cache drivers.
+- [ ] Match Laravel's observable cache expiration and mutation behavior.
 - [ ] Implement atomic cache locks and required Laravel cache semantics.
-- [ ] Implement an event dispatcher and listener registration.
-- [ ] Integrate queued listeners with the queue system.
+
+### Queues and scheduling
+
 - [ ] Implement queues, retries, failed jobs, and workers with `apalis`.
 - [ ] Implement scheduled tasks and overlap prevention.
+
+### Notifications and mail
+
 - [ ] Implement reusable notifications and channel selection.
+- [ ] Add general application-facing mail composition and template conventions.
+- [ ] Integrate queued mail after the queue boundary exists.
+
+### Filesystems and uploads
+
 - [ ] Implement local and object-storage disks with `object_store`.
 - [ ] Implement safe uploads, URLs, visibility, and streaming limits.
+
+### Localization and outbound HTTP
+
 - [ ] Implement localization and translated validation/auth messages.
 - [ ] Add configured outbound HTTP client conventions over `reqwest`.
-
-## 6. Production and ecosystem readiness
-
-- [ ] Document production deployment and secret management.
-- [ ] Document supported database and SMTP configuration.
-- [ ] Document worker, scheduler, and frontend asset deployment when available.
-- [ ] Add structured request tracing and production diagnostics.
-- [ ] Add metrics and OpenTelemetry export integration.
-- [ ] Qualify distributed sessions and other shared infrastructure when needed.
-- [ ] Regenerate and validate every supported starter as part of release checks.
-- [ ] Establish crate and generated-application release automation.
 
 ## Deferred work
 
 - Inertia SSR.
-- Distributed cache, sessions, queues, and scheduler coordination until their
-  corresponding framework-service milestones.
 - Full browser WebAuthn qualification pending an approved reliable test setup.
 
 ## Excluded work

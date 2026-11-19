@@ -101,10 +101,13 @@ the resulting `dist` files into the executable.
 
 ### Authentication foundation
 
-The behavioral baseline was rechecked on 2026-11-19 against Laravel Framework's
-`13.x` authentication notifications and the official React starter kit's
-`main` branch controllers, routes, pages, and feature tests. Aurelin tests the
-same public scenarios through Rust boundaries rather than copying PHP internals.
+The behavioral baseline was rechecked on 2026-11-19 against Laravel Framework
+13.x, Fortify commit `516753a645ee9e6adc68241ee7825f0ec563a0a5`, React
+starter commit `012f4248f70e255e32ad93f540aca5fb7e8c96fe`, and Vue starter
+commit `1959e1a26b1cabd02037c30210e14c5752d2b431`. The comparison covered
+routes and methods, Inertia props, redirects, validation responses, and the
+authentication security pipeline. Aurelin tests the same public scenarios
+through Rust boundaries rather than copying PHP internals.
 
 Authentication follows Laravel's package boundary. `aurelin-framework` owns
 framework primitives: bcrypt hashing with Laravel's default cost, password
@@ -136,6 +139,13 @@ application token storage. Login requests use the starter's five-per-minute
 email-and-IP limit; verification requests use Fortify's six-per-minute user
 limit; passkey ceremonies use the starter's ten-per-minute credential-or-session
 and IP limit. All return HTTP 429 and Laravel's rate-limit headers when exhausted.
+Only failed credentials consume the login limit, and an ordinary successful
+login clears earlier failures. Failed credential checks are timeboxed to
+Fortify's configurable 200 ms default for both ordinary and pre-two-factor
+login, while successful checks return as soon as password verification finishes.
+Successful credential validation also replaces bcrypt hashes whose cost no
+longer matches the application's configured default before the session or
+two-factor challenge continues.
 
 Login, registration, and password-reset routes enforce Fortify's guest-only
 boundary for both views and submissions. Password confirmation uses Fortify's
@@ -169,6 +179,20 @@ email normalization and uniqueness, verification state, password updates and
 throttling, account deletion, session invalidation, remember-me cookies, and
 SMTP delivery. Remaining parity differences must be reported precisely rather
 than treating this as a blanket complete-starter claim.
+
+The targeted comparison leaves these explicit authentication boundaries:
+
+- authentication events remain deferred until Aurelin has a general event
+  dispatcher, as tracked in the roadmap;
+- all default authentication features are currently generated together;
+  Laravel's feature-selective starter generation is pending a product decision;
+- Aurelin currently targets the official Inertia starter workflow, not
+  Fortify's complete content-negotiated JSON API, configurable route paths,
+  guards, domains, and middleware surface;
+- authentication and validation text is currently fixed English text pending
+  the general localization milestone;
+- full browser WebAuthn qualification remains deferred to the reliable browser
+  test setup recorded in the roadmap.
 
 Generated applications keep reusable behavior in a library target and a thin
 binary entry point. All Rust tests live in each crate's root `tests/` directory;
