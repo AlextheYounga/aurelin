@@ -101,6 +101,11 @@ the resulting `dist` files into the executable.
 
 ### Authentication foundation
 
+The behavioral baseline was rechecked on 2026-11-19 against Laravel Framework's
+`13.x` authentication notifications and the official React starter kit's
+`main` branch controllers, routes, pages, and feature tests. Aurelin tests the
+same public scenarios through Rust boundaries rather than copying PHP internals.
+
 Authentication follows Laravel's package boundary. `aurelin-framework` owns
 framework primitives: bcrypt hashing with Laravel's default cost, password
 reset token lifecycle, fixed-window rate limiting, temporary signed URLs, and
@@ -112,14 +117,15 @@ applications provide user persistence, migrations, action implementations,
 route/view selection, and frontend pages. The CLI only installs those packages
 and application-owned templates.
 
-Both frontend variants share registration, login, logout, protected dashboard,
-password-reset, email-verification, password-confirmation, two-factor, and
-passkey routes and screens. SeaORM 1.1 provides application data access, SeaQuery-backed
-`sea-orm-migration` owns the SQLite schema, and SQLx remains SeaORM's driver and
-the Tower session-store infrastructure. `axum-valid` integrates `validator`
-with Axum request extraction. `axum-login` 0.18 provides authenticated sessions
-and session-ID rotation, and `axum-tower-sessions-csrf` 0.1.1 validates
-state-changing requests.
+Both frontend variants share registration, login, logout, remember-me,
+protected dashboard, password-reset, email-verification,
+password-confirmation, profile, account-deletion, appearance, and a unified
+security screen for password, two-factor, and passkey management. SeaORM 1.1 provides application
+data access, SeaQuery-backed `sea-orm-migration` owns the SQLite schema, and
+SQLx remains SeaORM's driver and the Tower session-store infrastructure.
+`axum-valid` integrates `validator` with Axum request extraction. `axum-login`
+0.18 provides authenticated sessions and session-ID rotation, and
+`axum-tower-sessions-csrf` 0.1.1 validates state-changing requests.
 
 Password-reset tokens are random, stored only as SHA-256 digests, expire after
 60 minutes, and are deleted after Fortify invokes the generated application's
@@ -128,7 +134,8 @@ throttled, invalid-token, and successful-reset outcomes. Email verification
 uses Fortify-owned temporary signed URLs backed by `APP_KEY` instead of
 application token storage. Login requests use the starter's five-per-minute
 email-and-IP limit; verification requests use Fortify's six-per-minute user
-limit. Both return HTTP 429 and Laravel's rate-limit headers when exhausted.
+limit; passkey ceremonies use the starter's ten-per-minute credential-or-session
+and IP limit. All return HTTP 429 and Laravel's rate-limit headers when exhausted.
 
 Login, registration, and password-reset routes enforce Fortify's guest-only
 boundary for both views and submissions. Password confirmation uses Fortify's
@@ -147,10 +154,21 @@ credentials, opaque application-specific user handles, server-held ceremony
 state, and persisted credential-counter updates. React and Vue call the official
 `@laravel/passkeys` client against Laravel's route contract.
 
-The current development notification path logs reset and verification URLs.
-Production mail delivery and remaining official starter behavior are not yet
-implemented, so this remains a partial authentication starter rather than a
-complete parity claim.
+The log mailer remains the local default. Configuring `MAIL_MAILER=smtp` uses
+`lettre` for authenticated TLS, STARTTLS, or explicitly unencrypted local SMTP
+delivery. Registration and verification requests send signed verification
+links, while password-reset requests send the broker's expiring reset link.
+Remember-me extends the opaque server-side session to Laravel's five-year
+remembered-login lifetime; password changes invalidate other sessions through
+the authenticated user's password-hash session fingerprint.
+
+The generated integration suite follows the observable scenarios in Laravel's
+starter tests rather than porting PHP implementation assertions. It exercises
+the real Axum/Inertia boundary and persisted SQLite state for profile updates,
+email normalization and uniqueness, verification state, password updates and
+throttling, account deletion, session invalidation, remember-me cookies, and
+SMTP delivery. Remaining parity differences must be reported precisely rather
+than treating this as a blanket complete-starter claim.
 
 Generated applications keep reusable behavior in a library target and a thin
 binary entry point. All Rust tests live in each crate's root `tests/` directory;

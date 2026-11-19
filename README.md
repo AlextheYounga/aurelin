@@ -18,14 +18,14 @@ The repository currently provides foundational, tested behavior:
 - minimal React 19 and Vue 3 Inertia starters with Vite development and
   embedded production assets;
 - a shared SQLite authentication foundation with registration, login, logout,
-  login throttling, CSRF protection, persisted sessions, password reset, email
-  verification, and password confirmation.
+  remember-me sessions, login throttling, CSRF protection, persisted sessions,
+  password reset, email verification, password confirmation, two-factor
+  authentication, passkeys, account settings, and SMTP mail delivery.
 
-The authentication starter is still incomplete: notifications are logged in
-development rather than delivered through production mail, and confirmed-route
-enforcement and remaining Laravel starter-kit behavior are not implemented. See
-`CONTEXT.md` for the target and `docs/ARCHITECTURE.md` for exact implementation
-status and references.
+The authentication starter now covers the principal built-in Laravel 13 React
+and Vue flows, but it is not yet a complete parity claim. See `CONTEXT.md` for
+the target and `docs/ARCHITECTURE.md` for exact implementation status and
+intentional scope exclusions.
 
 ## Try the backend foundation
 
@@ -52,9 +52,8 @@ npm install
 cargo run
 ```
 
-Use `--frontend vue` for Vue. Both variants currently provide the same partial
-authentication workflow; they should not yet be described as complete Laravel
-authentication starters.
+Use `--frontend vue` for Vue. Both variants provide the same backend behavior
+and authentication workflow.
 
 Generate shell completion output with, for example:
 

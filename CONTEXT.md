@@ -14,9 +14,15 @@ This document establishes direction. It does not select crates, define a feature
 - **Backend:** Rust.
 - **Behavioral reference:** Laravel 13.
 - **Frontend:** First-class Inertia-style support.
-- **Initial frontend choices:** Vue or React, using Vite.
+- **Frontend choices:** Vue or React, using Vite. Aurelin will not provide
+  Svelte or Livewire starters; those frontend stacks are explicitly out of
+  scope.
+- **Inertia SSR:** Supported in a later milestone, not required for the initial
+  starter release.
 - **Templating:** No Blade equivalent.
 - **Authentication:** Working boilerplate equivalent to Laravel 13's built-in authentication starter experience for Vue and React.
+- **Starter variants:** WorkOS authentication and team support are explicitly
+  out of scope.
 - **V1 approach:** Reuse existing crates and frontend packages; write the minimum integration code necessary.
 
 Other stack choices remain undecided. Do not treat candidates discussed elsewhere as selected dependencies.
@@ -82,4 +88,3 @@ For each requested capability: establish the Laravel behavior, inspect reusable 
 A developer familiar with Laravel should recognize the application workflow, choose Vue or React, and start from working authentication without assembling the framework themselves. Existing libraries perform the underlying work; Aurelin makes them operate as one coherent Laravel-style stack in Rust.
 
 Additional reference: [Inertia](https://inertiajs.com/). Verify the applicable documentation and versions when implementation begins.
-
