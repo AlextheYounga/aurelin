@@ -24,8 +24,9 @@ The repository currently provides foundational, tested behavior:
 
 The authentication starter now covers the principal built-in Laravel 13 React
 and Vue flows, but it is not yet a complete parity claim. See `CONTEXT.md` for
-the target and `docs/ARCHITECTURE.md` for exact implementation status and
-intentional scope exclusions.
+the target, `docs/ROADMAP.md` for progress and remaining milestones, and
+`docs/ARCHITECTURE.md` for exact implementation status and intentional scope
+exclusions.
 
 ## Try the backend foundation
 
