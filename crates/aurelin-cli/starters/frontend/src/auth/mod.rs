@@ -1,18 +1,19 @@
 use std::{
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use aurelin_fortify::{
     CreatesNewUsers, EmailVerification, EmailVerificationError, EmailVerificationRateLimiter,
-    EmailVerificationRequest, LoginRateLimiter, RegistrationInput, ResetPasswords,
-    ResetPasswordsError, TwoFactorAuthentication, TwoFactorError, TwoFactorRateLimiter,
+    EmailVerificationRequest, LoginRateLimiter, PasskeyRateLimiter, RegistrationInput,
+    ResetPasswords, ResetPasswordsError, TwoFactorAuthentication, TwoFactorError,
+    TwoFactorRateLimiter,
     passkeys::{PasskeyConfig, PasskeyError, Passkeys},
 };
 use aurelin_framework::auth::{
-    BcryptPasswordHasher, PasswordHashError, PasswordResetBroker, PasswordResetCredentials,
-    PasswordResetError, PasswordResetRepository, PasswordResetRequest, RateLimitOutcome,
-    StoredPasswordResetToken,
+    BcryptPasswordHasher, FixedWindowRateLimiter, PasswordHashError, PasswordResetBroker,
+    PasswordResetCredentials, PasswordResetError, PasswordResetRepository, PasswordResetRequest,
+    RateLimitOutcome, StoredPasswordResetToken,
 };
 use axum_login::{AuthUser, AuthnBackend, UserId};
 use sea_orm::{
@@ -27,14 +28,19 @@ use crate::{
         CreateNewUser, CreateNewUserError, CreateUser, ResetUserPassword, ResetUserPasswordError,
     },
     entities::{password_reset_token, user},
+    mail::{MailError, Mailer},
     password_policy::{PasswordPolicy, PasswordPolicyViolation},
 };
 
 pub type AuthSession = axum_login::AuthSession<AuthBackend>;
 pub type User = user::Model;
 
+mod notifications;
 mod passkeys;
+mod settings;
 mod two_factor;
+
+pub use settings::ProfileUpdate;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct PublicUser {
@@ -85,9 +91,13 @@ pub struct AuthBackend {
     email_verification: EmailVerification,
     email_verification_attempts: EmailVerificationRateLimiter,
     password_policy: PasswordPolicy,
+    password_update_attempts: FixedWindowRateLimiter,
+    mailer: Mailer,
+    application_url: Arc<String>,
     pub(super) two_factor: TwoFactorAuthentication,
     pub(super) two_factor_attempts: TwoFactorRateLimiter,
     pub(super) passkeys: Passkeys,
+    passkey_attempts: PasskeyRateLimiter,
 }
 
 impl AuthBackend {
@@ -96,6 +106,7 @@ impl AuthBackend {
         application_key: &[u8],
         application_environment: &str,
         application_url: &str,
+        mailer: Mailer,
     ) -> Result<Self, AuthError> {
         let passwords = BcryptPasswordHasher::default();
         let dummy_password_hash = passwords.hash("aurelin-invalid-credentials").await?;
@@ -109,6 +120,9 @@ impl AuthBackend {
             email_verification: EmailVerification::new(application_key)?,
             email_verification_attempts: EmailVerificationRateLimiter::default(),
             password_policy: PasswordPolicy::for_environment(application_environment),
+            password_update_attempts: FixedWindowRateLimiter::new(6, Duration::from_secs(60)),
+            mailer,
+            application_url: Arc::new(application_url.trim_end_matches('/').to_owned()),
             two_factor: TwoFactorAuthentication::new(application_key, "Aurelin")?,
             two_factor_attempts: TwoFactorRateLimiter::default(),
             passkeys: Passkeys::new(PasskeyConfig::for_origin(
@@ -116,6 +130,7 @@ impl AuthBackend {
                 application_url,
                 application_key,
             )?)?,
+            passkey_attempts: PasskeyRateLimiter::default(),
             database,
             dummy_password_hash: Arc::new(dummy_password_hash),
             passwords,
@@ -149,6 +164,10 @@ impl AuthBackend {
 
     pub fn password_rules(&self) -> &'static str {
         self.password_policy.browser_rules()
+    }
+
+    pub fn application_url(&self) -> &str {
+        &self.application_url
     }
 
     pub async fn create_password_reset_token(
@@ -220,6 +239,10 @@ impl AuthBackend {
     pub async fn email_verification_attempt(&self, user_id: i64) -> RateLimitOutcome {
         self.email_verification_attempts.attempt(user_id).await
     }
+
+    pub async fn passkey_attempt(&self, key: &str) -> RateLimitOutcome {
+        self.passkey_attempts.attempt(key).await
+    }
 }
 
 impl AuthnBackend for AuthBackend {
@@ -271,6 +294,8 @@ pub enum AuthError {
     TwoFactor(#[from] TwoFactorError),
     #[error(transparent)]
     Passkey(#[from] PasskeyError),
+    #[error(transparent)]
+    Mail(#[from] MailError),
     #[error("this passkey is already registered")]
     PasskeyAlreadyRegistered,
     #[error("system clock produced an invalid timestamp")]

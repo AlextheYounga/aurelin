@@ -11,6 +11,7 @@ export default function Dashboard({ auth, csrf_token }: Props) {
             <Head title="Dashboard" />
             <h1>Dashboard</h1>
             <p>Welcome, {auth.user.name}.</p>
+            <Link href="/settings/profile">Settings</Link>
             <Link href="/settings/two-factor">Two-factor authentication</Link>
             <Link href="/settings/passkeys">Passkeys</Link>
             <Form action="/logout" method="post" headers={{ 'x-csrf-token': csrf_token }}>

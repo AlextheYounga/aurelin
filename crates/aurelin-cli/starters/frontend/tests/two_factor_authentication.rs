@@ -72,6 +72,7 @@ async fn confirmed_two_factor_setup_requires_a_code_or_single_use_recovery_code_
         )?)
         .await?;
     assert_eq!(enabled.status(), StatusCode::SEE_OTHER);
+    assert_eq!(enabled.headers()[header::LOCATION], "/settings/security");
     let secret = app
         .clone()
         .oneshot(request(
@@ -102,6 +103,10 @@ async fn confirmed_two_factor_setup_requires_a_code_or_single_use_recovery_code_
         )?)
         .await?;
     assert_eq!(two_factor_confirmed.status(), StatusCode::SEE_OTHER);
+    assert_eq!(
+        two_factor_confirmed.headers()[header::LOCATION],
+        "/settings/security"
+    );
     let recovery_codes = app
         .clone()
         .oneshot(request(

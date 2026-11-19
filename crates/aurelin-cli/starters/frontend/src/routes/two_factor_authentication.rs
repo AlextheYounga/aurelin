@@ -15,8 +15,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     auth::AuthSession,
     frontend::Frontend,
-    frontend_config::{TWO_FACTOR_CHALLENGE_COMPONENT, TWO_FACTOR_SETTINGS_COMPONENT},
+    frontend_config::TWO_FACTOR_CHALLENGE_COMPONENT,
     routes::{
+        login_session::{PENDING_REMEMBER_LOGIN, set_login_expiry},
         password_confirmation::{PASSWORD_CONFIRMATION_REDIRECT, password_is_confirmed},
         rate_limit,
         session_feedback::{FLASH_ERRORS, ValidationErrors, redirect_with_error},
@@ -28,17 +29,6 @@ const CHALLENGED_USER_ID: &str = "login.id";
 
 #[derive(Serialize)]
 struct ChallengeProps {
-    errors: ValidationErrors,
-    csrf_token: String,
-}
-
-#[derive(Serialize)]
-struct SettingsProps {
-    enabled: bool,
-    awaiting_confirmation: bool,
-    secret_key: Option<String>,
-    qr_code: Option<String>,
-    recovery_codes: Vec<String>,
     errors: ValidationErrors,
     csrf_token: String,
 }
@@ -60,7 +50,6 @@ pub fn routes() -> Router<Frontend> {
             "/two-factor-challenge",
             get(challenge).post(store_challenge),
         )
-        .route("/settings/two-factor", get(settings))
         .route(
             "/user/two-factor-authentication",
             post(enable).delete(disable),
@@ -150,6 +139,12 @@ async fn store_challenge(
     }
     auth.session.remove::<i64>(CHALLENGED_USER_ID).await?;
     auth.login(&user).await?;
+    let remember = auth
+        .session
+        .remove::<bool>(PENDING_REMEMBER_LOGIN)
+        .await?
+        .unwrap_or_default();
+    set_login_expiry(&auth.session, remember);
     let mut response = request.redirect(Inertia::redirect("/dashboard"))?;
     rate_limit::add_headers(
         &mut response,
@@ -160,57 +155,12 @@ async fn store_challenge(
     Ok(response)
 }
 
-async fn settings(
-    State(frontend): State<Frontend>,
-    auth: AuthSession,
-    request: InertiaRequest,
-) -> Result<Response, WebError> {
-    let Some(user) = auth.user.as_ref() else {
-        return Ok(request.redirect(Inertia::redirect("/login"))?);
-    };
-    if !password_is_confirmed(&auth).await? {
-        auth.session
-            .insert(PASSWORD_CONFIRMATION_REDIRECT, "/settings/two-factor")
-            .await?;
-        return Ok(request.redirect(Inertia::redirect("/user/confirm-password"))?);
-    }
-    let csrf_token = get_or_create_token(&auth.session)
-        .await
-        .map_err(WebError::Csrf)?;
-    let errors = auth
-        .session
-        .remove::<ValidationErrors>(FLASH_ERRORS)
-        .await?
-        .unwrap_or_default();
-    let configured = user.two_factor_secret.is_some();
-    let enabled = user.two_factor_confirmed_at.is_some();
-    Ok(request.render(
-        Inertia::response(
-            TWO_FACTOR_SETTINGS_COMPONENT,
-            SettingsProps {
-                enabled,
-                awaiting_confirmation: configured && !enabled,
-                secret_key: auth.backend.two_factor_secret_key(user)?,
-                qr_code: auth.backend.two_factor_qr_code(user)?,
-                recovery_codes: if enabled {
-                    auth.backend.two_factor_recovery_codes(user)?
-                } else {
-                    Vec::new()
-                },
-                errors,
-                csrf_token,
-            },
-        ),
-        move |context| frontend.document(context),
-    )?)
-}
-
 async fn enable(auth: AuthSession, request: InertiaRequest) -> Result<Response, WebError> {
     let Some(user) = confirmed_user(&auth, &request).await? else {
         return Ok(request.redirect(Inertia::redirect("/user/confirm-password"))?);
     };
     auth.backend.enable_two_factor(user).await?;
-    Ok(request.redirect(Inertia::redirect("/settings/two-factor"))?)
+    Ok(request.redirect(Inertia::redirect("/settings/security"))?)
 }
 
 async fn confirm(
@@ -231,11 +181,11 @@ async fn confirm(
             &request,
             "code",
             "The provided two factor authentication code was invalid.",
-            "/settings/two-factor",
+            "/settings/security",
         )
         .await;
     }
-    Ok(request.redirect(Inertia::redirect("/settings/two-factor"))?)
+    Ok(request.redirect(Inertia::redirect("/settings/security"))?)
 }
 
 async fn disable(auth: AuthSession, request: InertiaRequest) -> Result<Response, WebError> {
@@ -243,7 +193,7 @@ async fn disable(auth: AuthSession, request: InertiaRequest) -> Result<Response,
         return Ok(request.redirect(Inertia::redirect("/user/confirm-password"))?);
     };
     auth.backend.disable_two_factor(user).await?;
-    Ok(request.redirect(Inertia::redirect("/settings/two-factor"))?)
+    Ok(request.redirect(Inertia::redirect("/settings/security"))?)
 }
 
 async fn qr_code(auth: AuthSession, request: InertiaRequest) -> Result<Response, WebError> {
@@ -285,7 +235,7 @@ async fn regenerate_recovery_codes(
     auth.backend
         .regenerate_two_factor_recovery_codes(user)
         .await?;
-    Ok(request.redirect(Inertia::redirect("/settings/two-factor"))?)
+    Ok(request.redirect(Inertia::redirect("/settings/security"))?)
 }
 
 async fn confirmed_user<'a>(
@@ -297,7 +247,7 @@ async fn confirmed_user<'a>(
     };
     if !password_is_confirmed(auth).await? {
         auth.session
-            .insert(PASSWORD_CONFIRMATION_REDIRECT, "/settings/two-factor")
+            .insert(PASSWORD_CONFIRMATION_REDIRECT, "/settings/security")
             .await?;
         return Ok(None);
     }

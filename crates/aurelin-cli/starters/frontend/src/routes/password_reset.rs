@@ -134,8 +134,9 @@ async fn send_password_reset_link(
         .await?
     {
         PasswordResetRequest::Sent { token } => {
-            let email = urlencoding::encode(&input.email);
-            tracing::info!(reset_url = %format!("/reset-password/{token}?email={email}"), "password reset notification");
+            auth.backend
+                .send_password_reset(&input.email, &token)
+                .await?;
         }
         PasswordResetRequest::UnknownUser => {
             return redirect_with_error(

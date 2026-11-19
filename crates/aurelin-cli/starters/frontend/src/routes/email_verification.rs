@@ -4,7 +4,7 @@ use aurelin_framework::{
     axum::{
         Router,
         extract::{Path, Query, State},
-        http::StatusCode,
+        http::{HeaderMap, StatusCode, header},
         response::{IntoResponse, Response},
         routing::{get, post},
     },
@@ -77,6 +77,7 @@ async fn verify_email_notice(
 
 async fn send_verification_notification(
     auth: AuthSession,
+    headers: HeaderMap,
     request: InertiaRequest,
 ) -> Result<Response, WebError> {
     let Some(user) = auth.user.as_ref() else {
@@ -95,16 +96,24 @@ async fn send_verification_notification(
         let response = request.redirect(Inertia::redirect("/dashboard"))?;
         return Ok(with_rate_limit_headers(response, remaining));
     }
-    let verification_url = auth.backend.email_verification_url(user)?;
-    tracing::info!(
-        %verification_url,
-        "email verification notification"
-    );
+    auth.backend.send_email_verification(user).await?;
     auth.session
         .insert(FLASH_STATUS, "verification-link-sent")
         .await?;
-    let response = request.redirect(Inertia::redirect("/email/verify"))?;
+    let destination = previous_location(&headers).unwrap_or_else(|| "/".into());
+    let response = request.redirect(Inertia::redirect(&destination))?;
     Ok(with_rate_limit_headers(response, remaining))
+}
+
+fn previous_location(headers: &HeaderMap) -> Option<String> {
+    headers
+        .get(header::REFERER)?
+        .to_str()
+        .ok()?
+        .parse::<aurelin_framework::axum::http::Uri>()
+        .ok()?
+        .path_and_query()
+        .map(|path| path.as_str().to_owned())
 }
 
 async fn verify_email(
@@ -130,7 +139,7 @@ async fn verify_email(
         return Ok(with_rate_limit_headers(response, remaining));
     }
     if user.email_verified_at.is_some() {
-        let response = request.redirect(Inertia::redirect("/dashboard"))?;
+        let response = request.redirect(Inertia::redirect("/dashboard?verified=1"))?;
         return Ok(with_rate_limit_headers(response, remaining));
     }
     if !auth

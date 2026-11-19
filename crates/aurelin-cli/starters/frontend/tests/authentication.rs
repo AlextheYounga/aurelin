@@ -141,6 +141,7 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
             )?)
             .await?;
         assert_eq!(resent.status(), StatusCode::SEE_OTHER);
+        assert_eq!(resent.headers()[header::LOCATION], "/");
         assert_eq!(resent.headers()["x-ratelimit-limit"], "6");
         assert_eq!(
             resent.headers()["x-ratelimit-remaining"],

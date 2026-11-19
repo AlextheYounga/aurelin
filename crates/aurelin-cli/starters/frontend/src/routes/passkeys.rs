@@ -1,28 +1,29 @@
 use aurelin_framework::{
     axum::{
         Json, Router,
-        extract::{Path, State, rejection::JsonRejection},
+        extract::{ConnectInfo, Path, rejection::JsonRejection},
         http::StatusCode,
         response::{IntoResponse, Response},
         routing::{delete, get, post},
     },
     inertia::{Inertia, axum::InertiaRequest},
 };
-use axum_tower_sessions_csrf::get_or_create_token;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::{
     auth::{AuthError, AuthSession},
     frontend::Frontend,
-    frontend_config::PASSKEY_SETTINGS_COMPONENT,
     routes::{
+        login_session::set_login_expiry,
         password_confirmation::{
             PASSWORD_CONFIRMATION_REDIRECT, PASSWORD_CONFIRMED_AT, password_is_confirmed,
         },
         web_error::WebError,
     },
 };
+
+mod rate_limit;
 
 const REGISTRATION_CEREMONY: &str = "passkeys.registration";
 const LOGIN_CEREMONY: &str = "passkeys.login";
@@ -41,23 +42,9 @@ struct VerificationInput {
     remember: bool,
 }
 
-#[derive(Serialize)]
-struct PasskeyProps {
-    passkeys: Vec<PasskeyItem>,
-    csrf_token: String,
-}
-
-#[derive(Serialize)]
-struct PasskeyItem {
-    id: i64,
-    name: String,
-    last_used_at: Option<i64>,
-    created_at: i64,
-}
-
 pub fn routes() -> Router<Frontend> {
     Router::new()
-        .route("/settings/passkeys", get(settings))
+        .route("/.well-known/passkey-endpoints", get(passkey_endpoints))
         .route("/passkeys/login/options", get(login_options))
         .route("/passkeys/login", post(login))
         .route("/passkeys/confirm/options", get(confirmation_options))
@@ -67,48 +54,18 @@ pub fn routes() -> Router<Frontend> {
         .route("/user/passkeys/{id}", delete(destroy))
 }
 
-async fn settings(
-    State(frontend): State<Frontend>,
-    auth: AuthSession,
-    request: InertiaRequest,
-) -> Result<Response, WebError> {
-    let Some(user) = auth.user.as_ref() else {
-        return Ok(request.redirect(Inertia::redirect("/login"))?);
-    };
-    if !password_is_confirmed(&auth).await? {
-        auth.session
-            .insert(PASSWORD_CONFIRMATION_REDIRECT, "/settings/passkeys")
-            .await?;
-        return Ok(request.redirect(Inertia::redirect("/user/confirm-password"))?);
-    }
-    let csrf_token = get_or_create_token(&auth.session)
-        .await
-        .map_err(WebError::Csrf)?;
-    let passkeys = auth
-        .backend
-        .passkeys_for_user(user.id)
-        .await?
-        .into_iter()
-        .map(|passkey| PasskeyItem {
-            id: passkey.id,
-            name: passkey.name,
-            last_used_at: passkey.last_used_at,
-            created_at: passkey.created_at,
-        })
-        .collect();
-    Ok(request.render(
-        Inertia::response(
-            PASSKEY_SETTINGS_COMPONENT,
-            PasskeyProps {
-                passkeys,
-                csrf_token,
-            },
-        ),
-        move |context| frontend.document(context),
-    )?)
+async fn passkey_endpoints(auth: AuthSession) -> Json<Value> {
+    let security = format!("{}/settings/security", auth.backend.application_url());
+    Json(json!({
+        "enroll": security.clone(),
+        "manage": security,
+    }))
 }
 
-async fn registration_options(auth: AuthSession) -> Result<Response, WebError> {
+async fn registration_options(
+    auth: AuthSession,
+    ConnectInfo(address): ConnectInfo<std::net::SocketAddr>,
+) -> Result<Response, WebError> {
     let Some(user) = auth.user.as_ref() else {
         return Ok((
             StatusCode::UNAUTHORIZED,
@@ -118,7 +75,7 @@ async fn registration_options(auth: AuthSession) -> Result<Response, WebError> {
     };
     if !password_is_confirmed(&auth).await? {
         auth.session
-            .insert(PASSWORD_CONFIRMATION_REDIRECT, "/settings/passkeys")
+            .insert(PASSWORD_CONFIRMATION_REDIRECT, "/settings/security")
             .await?;
         return Ok((
             StatusCode::FORBIDDEN,
@@ -126,15 +83,22 @@ async fn registration_options(auth: AuthSession) -> Result<Response, WebError> {
         )
             .into_response());
     }
+    let limit = match rate_limit::attempt(&auth, address, None).await {
+        Ok(limit) => limit,
+        Err(response) => return Ok(response),
+    };
     let ceremony = auth.backend.start_passkey_registration(user).await?;
     auth.session
         .insert(REGISTRATION_CEREMONY, ceremony.id)
         .await?;
-    Ok(Json(json!({ "options": public_key_options(ceremony.options) })).into_response())
+    Ok(limit.add_headers(
+        Json(json!({ "options": public_key_options(ceremony.options) })).into_response(),
+    ))
 }
 
 async fn register(
     auth: AuthSession,
+    ConnectInfo(address): ConnectInfo<std::net::SocketAddr>,
     input: Result<Json<RegistrationInput>, JsonRejection>,
 ) -> Result<Response, WebError> {
     let Some(user) = auth.user.as_ref() else {
@@ -144,12 +108,23 @@ async fn register(
         )
             .into_response());
     };
+    if !password_is_confirmed(&auth).await? {
+        return Ok((
+            StatusCode::FORBIDDEN,
+            Json(json!({ "message": "Password confirmation required." })),
+        )
+            .into_response());
+    }
     let Json(input) = match input {
         Ok(input) => input,
         Err(error) => return Ok(error.into_response()),
     };
+    let limit = match rate_limit::attempt(&auth, address, Some(&input.credential)).await {
+        Ok(limit) => limit,
+        Err(response) => return Ok(response),
+    };
     let Some(ceremony_id) = auth.session.remove::<String>(REGISTRATION_CEREMONY).await? else {
-        return Ok(invalid_ceremony());
+        return Ok(limit.add_headers(invalid_ceremony()));
     };
     let passkey = match auth
         .backend
@@ -158,19 +133,26 @@ async fn register(
     {
         Ok(passkey) => passkey,
         Err(AuthError::PasskeyAlreadyRegistered) => {
-            return Ok((
-                StatusCode::UNPROCESSABLE_ENTITY,
-                Json(json!({ "message": "This passkey is already registered." })),
-            )
-                .into_response());
+            return Ok(limit.add_headers(
+                (
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                    Json(json!({ "message": "This passkey is already registered." })),
+                )
+                    .into_response(),
+            ));
         }
-        Err(AuthError::Passkey(_)) => return Ok(invalid_passkey()),
+        Err(AuthError::Passkey(_)) => return Ok(limit.add_headers(invalid_passkey())),
         Err(error) => return Err(error.into()),
     };
-    Ok(Json(json!({ "id": passkey.id.to_string(), "name": passkey.name })).into_response())
+    Ok(limit.add_headers(
+        Json(json!({ "id": passkey.id.to_string(), "name": passkey.name })).into_response(),
+    ))
 }
 
-async fn login_options(auth: AuthSession) -> Result<Response, WebError> {
+async fn login_options(
+    auth: AuthSession,
+    ConnectInfo(address): ConnectInfo<std::net::SocketAddr>,
+) -> Result<Response, WebError> {
     if auth.user.is_some() {
         return Ok((
             StatusCode::CONFLICT,
@@ -178,13 +160,20 @@ async fn login_options(auth: AuthSession) -> Result<Response, WebError> {
         )
             .into_response());
     }
+    let limit = match rate_limit::attempt(&auth, address, None).await {
+        Ok(limit) => limit,
+        Err(response) => return Ok(response),
+    };
     let ceremony = auth.backend.start_passkey_login()?;
     auth.session.insert(LOGIN_CEREMONY, ceremony.id).await?;
-    Ok(Json(json!({ "options": public_key_options(ceremony.options) })).into_response())
+    Ok(limit.add_headers(
+        Json(json!({ "options": public_key_options(ceremony.options) })).into_response(),
+    ))
 }
 
 async fn login(
     mut auth: AuthSession,
+    ConnectInfo(address): ConnectInfo<std::net::SocketAddr>,
     input: Result<Json<VerificationInput>, JsonRejection>,
 ) -> Result<Response, WebError> {
     if auth.user.is_some() {
@@ -198,9 +187,13 @@ async fn login(
         Ok(input) => input,
         Err(error) => return Ok(error.into_response()),
     };
-    let _remember = input.remember;
+    let limit = match rate_limit::attempt(&auth, address, Some(&input.credential)).await {
+        Ok(limit) => limit,
+        Err(response) => return Ok(response),
+    };
+    let remember = input.remember;
     let Some(ceremony_id) = auth.session.remove::<String>(LOGIN_CEREMONY).await? else {
-        return Ok(invalid_ceremony());
+        return Ok(limit.add_headers(invalid_ceremony()));
     };
     let user = match auth
         .backend
@@ -208,14 +201,18 @@ async fn login(
         .await
     {
         Ok(Some(user)) => user,
-        Ok(None) | Err(AuthError::Passkey(_)) => return Ok(invalid_passkey()),
+        Ok(None) | Err(AuthError::Passkey(_)) => return Ok(limit.add_headers(invalid_passkey())),
         Err(error) => return Err(error.into()),
     };
     auth.login(&user).await?;
-    Ok(Json(json!({ "redirect": "/dashboard" })).into_response())
+    set_login_expiry(&auth.session, remember);
+    Ok(limit.add_headers(Json(json!({ "redirect": "/dashboard" })).into_response()))
 }
 
-async fn confirmation_options(auth: AuthSession) -> Result<Response, WebError> {
+async fn confirmation_options(
+    auth: AuthSession,
+    ConnectInfo(address): ConnectInfo<std::net::SocketAddr>,
+) -> Result<Response, WebError> {
     let Some(user) = auth.user.as_ref() else {
         return Ok((
             StatusCode::UNAUTHORIZED,
@@ -223,15 +220,22 @@ async fn confirmation_options(auth: AuthSession) -> Result<Response, WebError> {
         )
             .into_response());
     };
+    let limit = match rate_limit::attempt(&auth, address, None).await {
+        Ok(limit) => limit,
+        Err(response) => return Ok(response),
+    };
     let ceremony = auth.backend.start_passkey_confirmation(user).await?;
     auth.session
         .insert(CONFIRMATION_CEREMONY, ceremony.id)
         .await?;
-    Ok(Json(json!({ "options": public_key_options(ceremony.options) })).into_response())
+    Ok(limit.add_headers(
+        Json(json!({ "options": public_key_options(ceremony.options) })).into_response(),
+    ))
 }
 
 async fn confirm(
     auth: AuthSession,
+    ConnectInfo(address): ConnectInfo<std::net::SocketAddr>,
     input: Result<Json<VerificationInput>, JsonRejection>,
 ) -> Result<Response, WebError> {
     let Some(user) = auth.user.as_ref() else {
@@ -245,8 +249,12 @@ async fn confirm(
         Ok(input) => input,
         Err(error) => return Ok(error.into_response()),
     };
+    let limit = match rate_limit::attempt(&auth, address, Some(&input.credential)).await {
+        Ok(limit) => limit,
+        Err(response) => return Ok(response),
+    };
     let Some(ceremony_id) = auth.session.remove::<String>(CONFIRMATION_CEREMONY).await? else {
-        return Ok(invalid_ceremony());
+        return Ok(limit.add_headers(invalid_ceremony()));
     };
     let confirmed = match auth
         .backend
@@ -258,12 +266,12 @@ async fn confirm(
         Err(error) => return Err(error.into()),
     };
     if !confirmed {
-        return Ok(invalid_passkey());
+        return Ok(limit.add_headers(invalid_passkey()));
     }
     auth.session
         .insert(PASSWORD_CONFIRMED_AT, unix_timestamp()?)
         .await?;
-    Ok(Json(json!({ "redirect": "/settings/passkeys" })).into_response())
+    Ok(limit.add_headers(Json(json!({ "redirect": "/settings/security" })).into_response()))
 }
 
 async fn destroy(
@@ -276,12 +284,12 @@ async fn destroy(
     };
     if !password_is_confirmed(&auth).await? {
         auth.session
-            .insert(PASSWORD_CONFIRMATION_REDIRECT, "/settings/passkeys")
+            .insert(PASSWORD_CONFIRMATION_REDIRECT, "/settings/security")
             .await?;
         return Ok(request.redirect(Inertia::redirect("/user/confirm-password"))?);
     }
     auth.backend.delete_passkey(user.id, id).await?;
-    Ok(request.redirect(Inertia::redirect("/settings/passkeys"))?)
+    Ok(request.redirect(Inertia::redirect("/settings/security"))?)
 }
 
 fn public_key_options(mut options: Value) -> Value {

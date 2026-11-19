@@ -6,7 +6,7 @@ use axum_login::AuthManagerLayerBuilder;
 use axum_tower_sessions_csrf::CsrfMiddleware;
 use tower_sessions_sqlx_store::SqliteStore;
 
-use crate::{auth::AuthBackend, frontend::Frontend};
+use crate::{auth::AuthBackend, frontend::Frontend, mail::Mailer};
 
 /// Compose routes, application state, and middleware here.
 pub async fn application(
@@ -16,6 +16,27 @@ pub async fn application(
     application_key: &[u8],
     application_environment: &str,
     application_url: &str,
+) -> Result<Router, Box<dyn std::error::Error>> {
+    application_with_mailer(
+        frontend,
+        database_url,
+        secure_cookie,
+        application_key,
+        application_environment,
+        application_url,
+        Mailer::log(),
+    )
+    .await
+}
+
+pub async fn application_with_mailer(
+    frontend: Frontend,
+    database_url: &str,
+    secure_cookie: bool,
+    application_key: &[u8],
+    application_environment: &str,
+    application_url: &str,
+    mailer: Mailer,
 ) -> Result<Router, Box<dyn std::error::Error>> {
     let version = frontend.version();
     let database = crate::database::connect(database_url).await?;
@@ -32,6 +53,7 @@ pub async fn application(
             application_key,
             application_environment,
             application_url,
+            mailer,
         )
         .await?,
         session_layer,
@@ -45,6 +67,7 @@ pub async fn application(
         .merge(crate::routes::password_reset::routes())
         .merge(crate::routes::password_confirmation::routes())
         .merge(crate::routes::passkeys::routes())
+        .merge(crate::routes::settings::routes())
         .merge(crate::routes::two_factor_authentication::routes())
         .nest("/build", frontend.asset_routes())
         .layer(VersionLayer::new(version))

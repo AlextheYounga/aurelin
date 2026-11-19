@@ -3,7 +3,12 @@ import { Form, Head, Link } from '@inertiajs/vue3';
 import { Passkeys } from '@laravel/passkeys';
 import { ref } from 'vue';
 
-const props = defineProps<{ csrf_token: string; errors: Record<string, string>; status?: string }>();
+const props = defineProps<{
+    csrf_token: string;
+    errors: Record<string, string>;
+    status?: string;
+    canResetPassword: boolean;
+}>();
 const passkeyError = ref<string>();
 const verifying = ref(false);
 
@@ -32,9 +37,14 @@ const verifyPasskey = async () => {
             <p v-if="errors.email" role="alert">{{ errors.email }}</p>
 
             <label for="password">Password</label>
-            <Link href="/forgot-password">Forgot your password?</Link>
+            <Link v-if="canResetPassword" href="/forgot-password">Forgot your password?</Link>
             <input id="password" name="password" type="password" required autocomplete="current-password" />
             <p v-if="errors.password" role="alert">{{ errors.password }}</p>
+
+            <label for="remember">
+                <input id="remember" name="remember" type="checkbox" />
+                Remember me
+            </label>
 
             <button type="submit" :disabled="processing">Log in</button>
         </Form>

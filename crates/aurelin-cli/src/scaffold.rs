@@ -76,6 +76,16 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
         dependencies["axum-login"] = value("0.18");
         dependencies["axum-tower-sessions-csrf"] = value("=0.1.1");
         dependencies["axum-valid"] = value("0.25");
+        dependencies["lettre"] = value({
+            let mut dependency = InlineTable::new();
+            dependency.insert("version", "0.11.19".into());
+            dependency.insert("default-features", false.into());
+            dependency.insert(
+                "features",
+                ["builder", "smtp-transport", "tokio1-rustls-tls"].into_iter().collect::<toml_edit::Array>().into(),
+            );
+            dependency
+        });
         dependencies["serde"] = value({
             let mut dependency = InlineTable::new();
             dependency.insert("version", "1".into());
@@ -148,9 +158,12 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
         path.join("tests/application.rs"),
         path.join("tests/authentication.rs"),
         path.join("tests/email_verification.rs"),
+        path.join("tests/mail_delivery.rs"),
         path.join("tests/password_reset.rs"),
         path.join("tests/password_policy.rs"),
+        path.join("tests/remember_me.rs"),
         path.join("tests/passkeys.rs"),
+        path.join("tests/settings.rs"),
         path.join("tests/two_factor_authentication.rs"),
     ] {
         if !source.exists() {

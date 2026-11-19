@@ -26,6 +26,24 @@ async fn passkey_options_follow_laravels_guest_and_password_confirmed_contract()
         .await?;
     let guest_cookie = session_cookie(&login_page)?;
     let csrf = csrf_token(login_page).await?;
+    let endpoints = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            "/.well-known/passkey-endpoints",
+            None,
+            None,
+            None,
+        )?)
+        .await?;
+    assert_eq!(endpoints.status(), StatusCode::OK);
+    let endpoints: serde_json::Value =
+        serde_json::from_slice(&to_bytes(endpoints.into_body(), usize::MAX).await?)?;
+    assert_eq!(
+        endpoints["enroll"],
+        "http://localhost:8000/settings/security"
+    );
+    assert_eq!(endpoints["manage"], endpoints["enroll"]);
     let login_options = app
         .clone()
         .oneshot(request(
@@ -66,6 +84,17 @@ async fn passkey_options_follow_laravels_guest_and_password_confirmed_contract()
         )?)
         .await?;
     assert_eq!(blocked.status(), StatusCode::FORBIDDEN);
+    let blocked_registration = app
+        .clone()
+        .oneshot(request(
+            Method::POST,
+            "/user/passkeys",
+            Some(&authenticated_cookie),
+            Some(&csrf),
+            Some(r#"{"name":"Laptop","credential":{}}"#),
+        )?)
+        .await?;
+    assert_eq!(blocked_registration.status(), StatusCode::FORBIDDEN);
 
     let confirmation_page = app
         .clone()
@@ -114,6 +143,56 @@ async fn passkey_options_follow_laravels_guest_and_password_confirmed_contract()
         registration_options["options"]["authenticatorSelection"]["userVerification"],
         "required"
     );
+    Ok(())
+}
+
+#[tokio::test]
+async fn passkey_routes_are_limited_to_ten_attempts_per_identifier_and_address()
+-> Result<(), Box<dyn Error>> {
+    let app = application(
+        Frontend::new(),
+        "sqlite::memory:",
+        false,
+        b"test-key",
+        "local",
+        "http://localhost:8000",
+    )
+    .await?;
+    let login_page = app
+        .clone()
+        .oneshot(request(Method::GET, "/login", None, None, None)?)
+        .await?;
+    let cookie = session_cookie(&login_page)?;
+
+    for remaining in (0..10).rev() {
+        let response = app
+            .clone()
+            .oneshot(request(
+                Method::GET,
+                "/passkeys/login/options",
+                Some(&cookie),
+                None,
+                None,
+            )?)
+            .await?;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(response.headers()["x-ratelimit-limit"], "10");
+        assert_eq!(
+            response.headers()["x-ratelimit-remaining"],
+            remaining.to_string()
+        );
+    }
+    let throttled = app
+        .oneshot(request(
+            Method::GET,
+            "/passkeys/login/options",
+            Some(&cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    assert_eq!(throttled.status(), StatusCode::TOO_MANY_REQUESTS);
+    assert!(throttled.headers().contains_key(header::RETRY_AFTER));
     Ok(())
 }
 

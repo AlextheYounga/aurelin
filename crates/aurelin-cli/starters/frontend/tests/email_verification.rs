@@ -44,8 +44,50 @@ async fn a_signed_link_verifies_the_authenticated_users_email() -> Result<(), Bo
         )?)
         .await?;
     let authenticated_cookie = session_cookie(&registered)?;
+    let mut resend_request = request(
+        Method::POST,
+        "/email/verification-notification",
+        Some(&authenticated_cookie),
+        Some(&csrf),
+        Some("{}"),
+    )?;
+    resend_request.headers_mut().insert(
+        header::REFERER,
+        "http://localhost:8000/email/verify".parse()?,
+    );
+    let resent = app.clone().oneshot(resend_request).await?;
+    assert_eq!(resent.status(), StatusCode::SEE_OTHER);
+    assert_eq!(resent.headers()[header::LOCATION], "/email/verify");
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64;
+    let invalid_hash_url =
+        EmailVerification::new(application_key)?.url(1, "wrong@example.com", now)?;
+    let invalid_hash = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            &invalid_hash_url,
+            Some(&authenticated_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    assert_eq!(invalid_hash.status(), StatusCode::FORBIDDEN);
+
+    let invalid_user_url =
+        EmailVerification::new(application_key)?.url(123, "ada@example.com", now)?;
+    let invalid_user = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            &invalid_user_url,
+            Some(&authenticated_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    assert_eq!(invalid_user.status(), StatusCode::FORBIDDEN);
+
     let verification_url =
         EmailVerification::new(application_key)?.url(1, "ada@example.com", now)?;
     let verified = app
@@ -65,6 +107,7 @@ async fn a_signed_link_verifies_the_authenticated_users_email() -> Result<(), Bo
     );
 
     let dashboard = app
+        .clone()
         .oneshot(request(
             Method::GET,
             "/dashboard",
@@ -74,6 +117,37 @@ async fn a_signed_link_verifies_the_authenticated_users_email() -> Result<(), Bo
         )?)
         .await?;
     assert_eq!(dashboard.status(), StatusCode::OK);
+
+    let verification_prompt = app
+        .clone()
+        .oneshot(request(
+            Method::GET,
+            "/email/verify",
+            Some(&authenticated_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    assert_eq!(verification_prompt.status(), StatusCode::FOUND);
+    assert_eq!(
+        verification_prompt.headers()[header::LOCATION],
+        "/dashboard"
+    );
+
+    let already_verified = app
+        .oneshot(request(
+            Method::GET,
+            &verification_url,
+            Some(&authenticated_cookie),
+            None,
+            None,
+        )?)
+        .await?;
+    assert_eq!(already_verified.status(), StatusCode::FOUND);
+    assert_eq!(
+        already_verified.headers()[header::LOCATION],
+        "/dashboard?verified=1"
+    );
     Ok(())
 }
 

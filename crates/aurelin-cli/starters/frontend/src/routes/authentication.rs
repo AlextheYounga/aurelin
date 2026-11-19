@@ -13,7 +13,8 @@ use aurelin_framework::{
 };
 use axum_tower_sessions_csrf::get_or_create_token;
 use axum_valid::{Valid, ValidationRejection};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde_json::Value;
 use validator::{Validate, ValidationErrors as ValidatorInputErrors};
 
 use crate::{
@@ -22,6 +23,7 @@ use crate::{
     frontend::Frontend,
     frontend_config::{DASHBOARD_COMPONENT, LOGIN_COMPONENT, REGISTER_COMPONENT},
     routes::{
+        login_session::{PENDING_REMEMBER_LOGIN, set_login_expiry},
         rate_limit,
         session_feedback::{FLASH_ERRORS, FLASH_STATUS, ValidationErrors, redirect_with_error},
         web_error::WebError,
@@ -35,6 +37,8 @@ struct AuthPageProps {
     status: Option<String>,
     #[serde(rename = "passwordRules", skip_serializing_if = "Option::is_none")]
     password_rules: Option<&'static str>,
+    #[serde(rename = "canResetPassword")]
+    can_reset_password: bool,
 }
 
 #[derive(Serialize)]
@@ -54,6 +58,20 @@ struct LoginInput {
     email: String,
     #[validate(length(min = 1))]
     password: String,
+    #[serde(default, deserialize_with = "deserialize_boolean")]
+    remember: bool,
+}
+
+fn deserialize_boolean<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(match Value::deserialize(deserializer)? {
+        Value::Bool(value) => value,
+        Value::Number(value) => value.as_i64() == Some(1),
+        Value::String(value) => matches!(value.as_str(), "1" | "true" | "on" | "yes"),
+        _ => false,
+    })
 }
 
 #[derive(Deserialize, Validate)]
@@ -121,6 +139,7 @@ async fn render_auth_page(
                 csrf_token,
                 status,
                 password_rules: include_password_rules.then(|| auth.backend.password_rules()),
+                can_reset_password: true,
             },
         ),
         move |context| frontend.document(context),
@@ -170,11 +189,15 @@ async fn store_login(
     };
     if user.two_factor_secret.is_some() && user.two_factor_confirmed_at.is_some() {
         auth.session.insert("login.id", user.id).await?;
+        auth.session
+            .insert(PENDING_REMEMBER_LOGIN, input.remember)
+            .await?;
         let mut response = request.redirect(Inertia::redirect("/two-factor-challenge"))?;
         rate_limit::add_headers(&mut response, LOGIN_ATTEMPTS_PER_MINUTE, remaining, None);
         return Ok(response);
     }
     auth.login(&user).await?;
+    set_login_expiry(&auth.session, input.remember);
     let mut response = request.redirect(Inertia::redirect("/dashboard"))?;
     rate_limit::add_headers(&mut response, LOGIN_ATTEMPTS_PER_MINUTE, remaining, None);
     Ok(response)
@@ -246,11 +269,7 @@ async fn store_registration(
             .await;
         }
     };
-    let verification_url = auth.backend.email_verification_url(&user)?;
-    tracing::info!(
-        %verification_url,
-        "email verification notification"
-    );
+    auth.backend.send_email_verification(&user).await?;
     auth.login(&user).await?;
     tracing::info!(user_id = user.id, "user registered");
     Ok(request.redirect(Inertia::redirect("/dashboard"))?)

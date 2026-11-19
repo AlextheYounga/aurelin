@@ -14,6 +14,7 @@ mod database;
 mod entities;
 pub mod frontend;
 pub mod frontend_config;
+pub mod mail;
 mod migration;
 pub mod password_policy;
 pub mod routes;
@@ -43,17 +44,19 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
         .get("APP_URL")
         .map(String::as_str)
         .unwrap_or("http://localhost:8000");
+    let mailer = mail::Mailer::from_environment(&environment)?;
     let frontend = frontend::Frontend::new();
     let _dev_server = frontend.start_dev_server();
     let listener = TcpListener::bind((config.host.as_str(), config.port)).await?;
     tracing::info!(address = %listener.local_addr()?, "Aurelin listening");
-    let application = bootstrap::application(
+    let application = bootstrap::application_with_mailer(
         frontend,
         database_url,
         secure_cookie,
         application_key.as_bytes(),
         application_environment,
         application_url,
+        mailer,
     )
     .await?;
     aurelin_framework::axum::serve(

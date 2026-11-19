@@ -26,6 +26,10 @@ cargo build --release
 Routes live in `src/routes/`, application composition in `src/bootstrap.rs`,
 and pages in `resources/js/pages`. SeaORM and SeaQuery migrations provide the
 SQLite data layer. The starter includes registration, login, logout,
-password-reset token handling, email verification, password confirmation,
-persisted sessions, CSRF protection, and login throttling. It does not yet
-include production mail delivery or confirmed-route enforcement.
+remember-me sessions, password-reset token handling, email verification,
+password confirmation, profile and security settings, two-factor
+authentication, passkeys, CSRF protection, and throttling.
+
+Mail is logged locally by default. For production delivery, set
+`MAIL_MAILER=smtp` and configure `MAIL_HOST`, `MAIL_PORT`, `MAIL_ENCRYPTION`,
+`MAIL_FROM_ADDRESS`, and optional SMTP credentials in `.env`.

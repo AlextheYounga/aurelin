@@ -6,9 +6,10 @@ type Props = {
     csrf_token: string;
     errors: Record<string, string>;
     status?: string;
+    canResetPassword: boolean;
 };
 
-export default function Login({ csrf_token, errors, status }: Props) {
+export default function Login({ csrf_token, errors, status, canResetPassword }: Props) {
     const [passkeyError, setPasskeyError] = useState<string>();
     const [verifying, setVerifying] = useState(false);
 
@@ -38,9 +39,14 @@ export default function Login({ csrf_token, errors, status }: Props) {
                         {errors.email && <p role="alert">{errors.email}</p>}
 
                         <label htmlFor="password">Password</label>
-                        <Link href="/forgot-password">Forgot your password?</Link>
+                        {canResetPassword && <Link href="/forgot-password">Forgot your password?</Link>}
                         <input id="password" name="password" type="password" required autoComplete="current-password" />
                         {errors.password && <p role="alert">{errors.password}</p>}
+
+                        <label htmlFor="remember">
+                            <input id="remember" name="remember" type="checkbox" />
+                            Remember me
+                        </label>
 
                         <button type="submit" disabled={processing}>Log in</button>
                     </>

@@ -15,7 +15,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Create an HTTP application (frontend and authentication are not installed yet)
+    /// Create an HTTP application, optionally with the React or Vue authentication starter
     New {
         /// Destination directory; must not already exist
         path: PathBuf,
@@ -25,7 +25,7 @@ enum Commands {
         /// Cargo package name; defaults to the destination directory name
         #[arg(long)]
         name: Option<String>,
-        /// Install a minimal Inertia frontend
+        /// Install a React or Vue Inertia authentication starter
         #[arg(long, value_enum)]
         frontend: Option<scaffold::Frontend>,
     },
