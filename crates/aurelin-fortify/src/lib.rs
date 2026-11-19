@@ -6,6 +6,7 @@
 pub use aurelin_passkeys as passkeys;
 
 mod actions;
+pub mod axum;
 mod email_verification;
 mod email_verification_rate_limiter;
 mod login_rate_limiter;
