@@ -23,6 +23,11 @@ async fn bcrypt_uses_laravels_default_cost_and_verifies_passwords() {
     assert!(password_hash.starts_with("$2b$12$"));
     assert_eq!(passwords.verify("correct horse battery staple", &password_hash).await.ok(), Some(true));
     assert_eq!(passwords.verify("incorrect", &password_hash).await.ok(), Some(false));
+    assert_eq!(passwords.needs_rehash(&password_hash).ok(), Some(false));
+
+    let lower_cost_hash = BcryptPasswordHasher::new(4).hash("correct horse battery staple").await;
+    assert!(lower_cost_hash.is_ok());
+    assert_eq!(lower_cost_hash.ok().and_then(|hash| passwords.needs_rehash(&hash).ok()), Some(true));
 }
 
 #[tokio::test]

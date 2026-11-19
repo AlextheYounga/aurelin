@@ -1,4 +1,6 @@
-use bcrypt::{DEFAULT_COST, hash, verify};
+use std::str::FromStr;
+
+use bcrypt::{DEFAULT_COST, HashParts, hash, verify};
 use thiserror::Error;
 use tokio::task::{JoinError, spawn_blocking};
 
@@ -28,6 +30,11 @@ impl BcryptPasswordHasher {
         let password = password.to_owned();
         let password_hash = password_hash.to_owned();
         spawn_blocking(move || verify(password, &password_hash).map_err(|_| PasswordHashError::Password)).await?
+    }
+
+    pub fn needs_rehash(&self, password_hash: &str) -> Result<bool, PasswordHashError> {
+        let parts = HashParts::from_str(password_hash).map_err(|_| PasswordHashError::Password)?;
+        Ok(parts.get_cost() != self.cost)
     }
 }
 
