@@ -11,10 +11,8 @@ The goal is simple: start with a complete application, not a collection of
 integration decisions.
 
 > [!IMPORTANT]
-> Aurelin is under active development. Version 0.1.0 is available on crates.io,
-> while this branch contains unreleased guided-generation and queue work. It is
-> suitable for exploring and contributing, but is not yet recommended for
-> production applications.
+> Aurelin is under active development. It is suitable for exploring and
+> contributing, but is not yet recommended for production applications.
 
 ## What you get
 
@@ -41,13 +39,11 @@ content, and interface.
 
 ## Quick start
 
-Until the next coordinated crate release, clone the repository and generate a
-React application against its matching local framework source:
+Install Aurelin and generate a React application:
 
 ```sh
-cargo run -p aurelin-cli -- new /tmp/my-aurelin-app \
-  --framework-path "$PWD/crates/aurelin-framework" \
-  --frontend react
+cargo install aurelin-cli
+aurelin new /tmp/my-aurelin-app --frontend react
 
 cd /tmp/my-aurelin-app
 npm install
@@ -60,12 +56,12 @@ Use `--frontend vue` for Vue, or omit `--frontend` to generate a backend-only
 application:
 
 ```sh
-cargo run -p aurelin-cli -- new /tmp/my-aurelin-api \
-  --framework-path "$PWD/crates/aurelin-framework"
+aurelin new /tmp/my-aurelin-api
 ```
 
-The `--framework-path` option keeps unreleased CLI and framework changes on the
-same version. Released CLI versions generate registry dependencies directly.
+Generated applications use the matching Aurelin crates from crates.io. Aurelin
+contributors can pass `--framework-path` to test against a local framework
+checkout instead.
 
 ## The Aurelin approach
 

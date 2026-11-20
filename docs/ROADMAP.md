@@ -39,9 +39,9 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
       requirements while preserving local workspace development.
 - [x] Publish the initial 0.1.0 versions of `aurelin-framework`,
       `aurelin-passkeys`, `aurelin-fortify`, and `aurelin-cli`.
-- [ ] Publish a coordinated release containing guided generation and queue
+- [x] Publish a coordinated release containing guided generation and queue
       support in dependency order.
-- [ ] Install the released CLI with `cargo install aurelin-cli` on a clean
+- [x] Install the released CLI with `cargo install aurelin-cli` on a clean
       machine or equivalent isolated environment.
 - [x] Generate registry dependencies by default instead of requiring
       `--framework-path`.

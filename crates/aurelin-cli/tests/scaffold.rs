@@ -73,8 +73,9 @@ fn generated_projects_use_published_aurelin_versions_by_default() -> TestResult 
         .output()?;
     assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
     let manifest = fs::read_to_string(destination.join("Cargo.toml"))?;
-    assert!(manifest.contains(r#"aurelin-framework = { version = "0.2.0" }"#));
-    assert!(manifest.contains(r#"aurelin-fortify = { version = "0.2.0" }"#));
+    let version = env!("CARGO_PKG_VERSION");
+    assert!(manifest.contains(&format!(r#"aurelin-framework = {{ version = "{version}" }}"#)));
+    assert!(manifest.contains(&format!(r#"aurelin-fortify = {{ version = "{version}" }}"#)));
     assert!(!manifest.contains("aurelin-framework = { path"));
     Ok(())
 }
