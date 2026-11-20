@@ -13,7 +13,7 @@ if ! cargo set-version --help >/dev/null 2>&1; then
     exit 1
 fi
 
-repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repository_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repository_root"
 
 cargo set-version "$1" --workspace
