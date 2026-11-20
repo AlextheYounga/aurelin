@@ -83,7 +83,6 @@ pub async fn application_with_options(
     let version = frontend.version();
     let database = crate::database::connect(database_url).await?;
     let session_store = SqliteStore::new(database.get_sqlite_connection_pool().clone());
-    session_store.migrate().await?;
     let session_layer = aurelin_framework::session::web_session_layer(
         session_store,
         "aurelin_session",
@@ -107,7 +106,7 @@ pub async fn application_with_options(
         .merge(crate::routes::http::routes())
         .merge(aurelin_fortify::axum::routes::<Frontend, AuthBackend>())
         .merge(crate::routes::settings::routes())
-        .nest("/build", frontend.asset_routes())
+        .merge(frontend.asset_routes())
         .layer(VersionLayer::new(version))
         .layer(middleware::from_fn(CsrfMiddleware::middleware))
         .layer(auth_layer)

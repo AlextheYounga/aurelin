@@ -4,7 +4,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
     base: '/build/',
-    plugins: [inertia(), react()],
+    plugins: [inertia({ ssr: false }), react()],
     server: { port: 5173, strictPort: true, hmr: { port: 5173 } },
     build: {
         manifest: true,
