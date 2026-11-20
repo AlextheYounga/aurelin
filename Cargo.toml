@@ -2,6 +2,12 @@
 members = ["crates/aurelin-cli", "crates/aurelin-fortify", "crates/aurelin-framework", "crates/aurelin-passkeys"]
 resolver = "3"
 
+[workspace.package]
+authors = ["Alex Younger"]
+description = "Aurelin is a Rust translation of Laravel"
+license = "MIT"
+repository = "https://github.com/AlextheYounga/aurelin.git"
+
 [workspace.lints.clippy]
 correctness = { level = "deny", priority = -1 }
 suspicious = { level = "deny", priority = -1 }
