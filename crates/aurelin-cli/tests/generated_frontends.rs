@@ -90,7 +90,8 @@ fn react_and_vue_projects_compile_and_test_their_inertia_boundaries() -> Result<
         assert!(migration_status.contains("m20261118_000001_create_auth_tables"));
 
         assert!(destination.join("package-lock.json").is_file());
-        assert!(destination.join("vite.config.ts").is_file());
+        let vite_config = fs::read_to_string(destination.join("vite.config.ts"))?;
+        assert!(vite_config.contains("base: command === 'build' ? '/build/' : '',"));
     }
     Ok(())
 }

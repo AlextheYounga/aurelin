@@ -86,15 +86,15 @@ async fn vite_assets_are_proxied_at_the_urls_used_by_the_document() -> Result<()
     )
     .await?;
 
+    vite.join().map_err(|_| "fake Vite server panicked")??;
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_bytes(response.into_body(), usize::MAX).await?;
     assert_eq!(body.as_ref(), b"export default {};\n");
-    vite.join().map_err(|_| "fake Vite server panicked")??;
     Ok(())
 }
 
 fn fake_vite_server() -> Result<thread::JoinHandle<std::io::Result<()>>, Box<dyn Error>> {
-    let listener = TcpListener::bind("127.0.0.1:5173")?;
+    let listener = TcpListener::bind("[::]:5173")?;
     listener.set_nonblocking(true)?;
     Ok(thread::spawn(move || {
         let deadline = Instant::now() + Duration::from_secs(5);
