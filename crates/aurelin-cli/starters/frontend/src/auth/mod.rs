@@ -28,8 +28,8 @@ use crate::{
     actions::{
         CreateNewUser, CreateNewUserError, CreateUser, ResetUserPassword, ResetUserPasswordError,
     },
+    config::password_policy::{PasswordPolicy, PasswordPolicyViolation},
     entities::{password_reset_token, user},
-    password_policy::{PasswordPolicy, PasswordPolicyViolation},
 };
 
 pub type AuthSession = axum_login::AuthSession<AuthBackend>;

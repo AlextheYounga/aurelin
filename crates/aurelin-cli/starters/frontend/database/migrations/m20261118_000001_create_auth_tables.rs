@@ -58,10 +58,24 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(TowerSessions::Table)
+                    .if_not_exists()
+                    .col(text(TowerSessions::Id).primary_key())
+                    .col(binary(TowerSessions::Data))
+                    .col(big_integer(TowerSessions::ExpiryDate))
+                    .to_owned(),
+            )
+            .await?;
         Ok(())
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(TowerSessions::Table).to_owned())
+            .await?;
         manager
             .drop_table(Table::drop().table(Passkeys::Table).to_owned())
             .await?;
@@ -109,4 +123,12 @@ enum Passkeys {
     LastUsedAt,
     CreatedAt,
     UpdatedAt,
+}
+
+#[derive(DeriveIden)]
+enum TowerSessions {
+    Table,
+    Id,
+    Data,
+    ExpiryDate,
 }

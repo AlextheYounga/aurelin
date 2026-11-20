@@ -16,8 +16,8 @@ use validator::{Validate, ValidationErrors as ValidatorInputErrors};
 
 use crate::{
     auth::{AuthSession, ProfileUpdate, PublicUser},
+    config::frontend::PROFILE_SETTINGS_COMPONENT,
     frontend::Frontend,
-    frontend_config::PROFILE_SETTINGS_COMPONENT,
     routes::{
         session_feedback::{FLASH_ERRORS, FLASH_STATUS, ValidationErrors, redirect_with_error},
         web_error::WebError,

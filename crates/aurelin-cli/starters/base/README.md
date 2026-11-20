@@ -1,8 +1,14 @@
 # Aurelin application
 
 ```sh
-cargo run
+cargo aurelin serve
 ```
+
+Run `cargo aurelin` to list every command provided by the application.
+Application migrations live in `database/migrations/`; run them with `cargo
+aurelin migrate`.
+Add application-specific commands in `src/console/mod.rs` and delegate their
+business work to focused application modules.
 
 Open <http://127.0.0.1:8000>. Run commands from this directory; `.env` is
 resolved relative to the current working directory. External environment
@@ -16,7 +22,7 @@ Define background jobs in `src/jobs.rs`, dispatch them through the SQLite queue,
 and run a worker in another terminal:
 
 ```sh
-cargo run -- worker
+cargo aurelin queue:work
 ```
 
 This is the backend foundation, not the finished Vue/React authentication

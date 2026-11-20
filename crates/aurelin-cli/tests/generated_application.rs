@@ -49,6 +49,12 @@ fn generated_project_builds_tests_and_serves_real_http() -> Result<(), Box<dyn E
         .arg(cli_root.join("../aurelin-framework"))
         .output()?;
     assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    assert!(destination.join("database/database.sqlite").is_file());
+    assert!(destination.join("database/migrations/mod.rs").is_file());
+    assert!(
+        fs::read_to_string(destination.join(".env"))?
+            .contains("DATABASE_URL=sqlite://database/database.sqlite?mode=rwc")
+    );
 
     // Share dependency artifacts with the workspace to keep this real
     // generated-project check inexpensive after the first run.
@@ -71,8 +77,25 @@ fn generated_project_builds_tests_and_serves_real_http() -> Result<(), Box<dyn E
             String::from_utf8_lossy(&output.stderr)
         );
     }
+    let commands =
+        Command::new("cargo").arg("aurelin").env("CARGO_TARGET_DIR", &target).current_dir(&destination).output()?;
+    assert!(commands.status.success(), "{}", String::from_utf8_lossy(&commands.stderr));
+    let commands = String::from_utf8(commands.stdout)?;
+    assert!(commands.contains("serve"));
+    assert!(commands.contains("migrate"));
+    assert!(commands.contains("queue:work"));
+
+    let migrated = Command::new("cargo")
+        .args(["aurelin", "migrate"])
+        .env("CARGO_TARGET_DIR", &target)
+        .current_dir(&destination)
+        .output()?;
+    assert!(migrated.status.success(), "{}", String::from_utf8_lossy(&migrated.stderr));
+    assert!(String::from_utf8(migrated.stdout)?.contains("Applied 0 migration(s)."));
+
     let binary = target.join("debug").join(format!("aurelin-smoke-app{EXE_SUFFIX}"));
     let child = Command::new(&binary)
+        .arg("serve")
         .current_dir(&destination)
         .env_clear()
         .env("SERVER_PORT", "0")
@@ -111,6 +134,7 @@ fn generated_project_builds_tests_and_serves_real_http() -> Result<(), Box<dyn E
 
     let occupied = TcpListener::bind("127.0.0.1:0")?;
     let output = Command::new(&binary)
+        .arg("serve")
         .current_dir(&destination)
         .env_clear()
         .env("SERVER_PORT", occupied.local_addr()?.port().to_string())
@@ -118,7 +142,7 @@ fn generated_project_builds_tests_and_serves_real_http() -> Result<(), Box<dyn E
     assert!(!output.status.success(), "binding failure must not report success");
 
     fs::write(destination.join(".env"), "PASSWORD=\"secret-without-closing-quote")?;
-    let output = Command::new(&binary).current_dir(&destination).env_clear().output()?;
+    let output = Command::new(&binary).arg("serve").current_dir(&destination).env_clear().output()?;
     assert!(!output.status.success(), "invalid dotenv must not start a server");
     assert!(!String::from_utf8_lossy(&output.stderr).contains("secret-without-closing-quote"));
     Ok(())

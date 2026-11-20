@@ -17,7 +17,7 @@ use aurelin_framework::{
         http::{Method, Request, Response, header},
     },
 };
-use __AURELIN_CRATE__::{bootstrap::application, frontend::Frontend};
+use __AURELIN_CRATE__::{bootstrap::application, database, frontend::Frontend};
 use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
 use tower::ServiceExt;
 
@@ -30,6 +30,7 @@ async fn successful_login_rehashes_a_password_with_outdated_bcrypt_parameters()
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     ));
     let database_url = format!("sqlite://{}?mode=rwc", database_path.display());
+    database::migrate(&database_url).await?;
     let app = application(
         Frontend::new(),
         &database_url,

@@ -8,8 +8,8 @@ use serde::Serialize;
 use super::{SettingsAuth, unauthenticated_destination, verified_user};
 use crate::{
     auth::{AuthSession, PublicUser},
+    config::frontend::APPEARANCE_SETTINGS_COMPONENT,
     frontend::Frontend,
-    frontend_config::APPEARANCE_SETTINGS_COMPONENT,
     routes::web_error::WebError,
 };
 

@@ -6,8 +6,8 @@ use aurelin_framework::axum::{
 };
 use __AURELIN_CRATE__::{
     bootstrap::application,
+    config::frontend::{DEV_SCRIPT, WELCOME_COMPONENT},
     frontend::Frontend,
-    frontend_config::{DEV_SCRIPT, WELCOME_COMPONENT},
 };
 use tower::ServiceExt;
 

@@ -11,8 +11,8 @@ use aurelin_framework::axum::{
 };
 use __AURELIN_CRATE__::{
     bootstrap::application,
+    config::password_policy::{PasswordPolicy, PasswordPolicyViolation},
     frontend::Frontend,
-    password_policy::{PasswordPolicy, PasswordPolicyViolation},
 };
 use tokio::net::TcpListener;
 use tower::ServiceExt;

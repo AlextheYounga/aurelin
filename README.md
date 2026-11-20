@@ -47,10 +47,13 @@ aurelin new /tmp/my-aurelin-app --frontend react
 
 cd /tmp/my-aurelin-app
 npm install
-cargo run
+cargo aurelin migrate
+cargo aurelin dev
 ```
 
 Open <http://127.0.0.1:8000> and register an account.
+Run `cargo aurelin` inside the generated project to list its application
+commands.
 
 Use `--frontend vue` for Vue, or omit `--frontend` to generate a backend-only
 application:

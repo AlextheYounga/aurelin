@@ -3,7 +3,7 @@ mod support;
 use std::error::Error;
 
 use aurelin_framework::axum::http::{Method, StatusCode, header};
-use __AURELIN_CRATE__::{bootstrap::application, frontend::Frontend};
+use __AURELIN_CRATE__::{bootstrap::application, database, frontend::Frontend};
 use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
 use support::settings::*;
 use tower::ServiceExt;
@@ -12,6 +12,7 @@ use tower::ServiceExt;
 async fn settings_update_profile_password_and_delete_the_account() -> Result<(), Box<dyn Error>> {
     let database_path = temporary_database_path()?;
     let database_url = format!("sqlite://{}?mode=rwc", database_path.display());
+    database::migrate(&database_url).await?;
     let application_key = b"test-key";
     let app = application(
         Frontend::new(),

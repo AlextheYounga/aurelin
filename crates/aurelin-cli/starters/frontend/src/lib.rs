@@ -10,13 +10,14 @@ use tokio::net::TcpListener;
 mod actions;
 mod auth;
 pub mod bootstrap;
-mod database;
+pub mod config;
+pub mod console;
+pub mod database;
 mod entities;
 pub mod frontend;
-pub mod frontend_config;
 pub mod jobs;
-mod migration;
-pub mod password_policy;
+#[path = "../database/migrations/mod.rs"]
+mod migrations;
 pub mod routes;
 
 pub async fn run() -> Result<(), Box<dyn Error>> {
@@ -25,22 +26,18 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
         .with_writer(io::stderr)
         .init();
     let environment = environment(Path::new("."))?;
+    console::run(environment).await
+}
+
+async fn serve(
+    environment: std::collections::HashMap<String, String>,
+    frontend_development_server: bool,
+) -> Result<(), Box<dyn Error>> {
     let config = ServerConfig::from_environment(environment.clone())?;
     let database_url = environment
         .get("DATABASE_URL")
         .map(String::as_str)
-        .unwrap_or("sqlite://database.sqlite?mode=rwc");
-    match std::env::args().nth(1).as_deref() {
-        Some("worker") => return jobs::work(database_url).await,
-        Some(command) => {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("unknown command `{command}`; expected `worker`"),
-            )
-            .into());
-        }
-        None => {}
-    }
+        .unwrap_or("sqlite://database/database.sqlite?mode=rwc");
     let secure_cookie = environment
         .get("SESSION_SECURE_COOKIE")
         .map(String::as_str)
@@ -57,7 +54,7 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
         .unwrap_or("http://localhost:8000");
     let mailer = aurelin_framework::mail::Mailer::from_environment(&environment)?;
     let frontend = frontend::Frontend::new();
-    let _dev_server = frontend.start_dev_server();
+    let _dev_server = frontend_development_server.then(|| frontend.start_dev_server());
     let listener = TcpListener::bind((config.host.as_str(), config.port)).await?;
     tracing::info!(address = %listener.local_addr()?, "Aurelin listening");
     let application = bootstrap::application_with_mailer(

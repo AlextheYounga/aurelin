@@ -13,8 +13,8 @@ use serde::Serialize;
 
 use crate::{
     auth::{AuthSession, PublicUser},
+    config::frontend::WELCOME_COMPONENT,
     frontend::Frontend,
-    frontend_config::WELCOME_COMPONENT,
     routes::web_error::WebError,
 };
 

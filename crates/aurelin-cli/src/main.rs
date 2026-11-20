@@ -57,14 +57,11 @@ fn run(cli: Cli) -> Result<()> {
             scaffold::create(&path, &framework, name.as_deref(), frontend)?;
             if frontend.is_some() {
                 eprintln!(
-                    "Created {}. Run `npm install`, then `cargo run`. Start a queue worker with `cargo run -- worker`.",
+                    "Created {}. Run `npm install`, `cargo aurelin migrate`, then `cargo aurelin dev`.",
                     path.display()
                 );
             } else {
-                eprintln!(
-                    "Created {}. Run `cargo run` to start the server. Start a queue worker with `cargo run -- worker`.",
-                    path.display()
-                );
+                eprintln!("Created {}. Run `cargo aurelin serve` to start the server.", path.display());
             }
         }
         Commands::Completions { shell } => {

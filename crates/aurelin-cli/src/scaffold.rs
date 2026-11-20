@@ -80,6 +80,12 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
     dependencies["tokio"] = value(tokio);
     dependencies["tracing"] = value("0.1");
     dependencies["tracing-subscriber"] = value("0.3");
+    dependencies["clap"] = value({
+        let mut dependency = InlineTable::new();
+        dependency.insert("version", "4".into());
+        dependency.insert("features", ["derive"].into_iter().collect::<toml_edit::Array>().into());
+        dependency
+    });
     dependencies["serde_json"] = value("1");
     dependencies["serde"] = value({
         let mut dependency = InlineTable::new();
@@ -87,33 +93,33 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
         dependency.insert("features", ["derive"].into_iter().collect::<toml_edit::Array>().into());
         dependency
     });
+    dependencies["sea-orm"] = value({
+        let mut dependency = InlineTable::new();
+        dependency.insert("version", "1.1".into());
+        dependency.insert("default-features", false.into());
+        dependency.insert(
+            "features",
+            ["macros", "runtime-tokio-rustls", "sqlx-sqlite", "sqlite-use-returning-for-3_35"]
+                .into_iter()
+                .collect::<toml_edit::Array>()
+                .into(),
+        );
+        dependency
+    });
+    dependencies["sea-orm-migration"] = value({
+        let mut dependency = InlineTable::new();
+        dependency.insert("version", "1.1".into());
+        dependency.insert("default-features", false.into());
+        dependency.insert(
+            "features",
+            ["runtime-tokio-rustls", "sqlx-sqlite"].into_iter().collect::<toml_edit::Array>().into(),
+        );
+        dependency
+    });
     if frontend.is_some() {
         dependencies["axum-login"] = value("0.18");
         dependencies["axum-tower-sessions-csrf"] = value("=0.1.1");
         dependencies["axum-valid"] = value("0.25");
-        dependencies["sea-orm"] = value({
-            let mut dependency = InlineTable::new();
-            dependency.insert("version", "1.1".into());
-            dependency.insert("default-features", false.into());
-            dependency.insert(
-                "features",
-                ["macros", "runtime-tokio-rustls", "sqlx-sqlite", "sqlite-use-returning-for-3_35"]
-                    .into_iter()
-                    .collect::<toml_edit::Array>()
-                    .into(),
-            );
-            dependency
-        });
-        dependencies["sea-orm-migration"] = value({
-            let mut dependency = InlineTable::new();
-            dependency.insert("version", "1.1".into());
-            dependency.insert("default-features", false.into());
-            dependency.insert(
-                "features",
-                ["runtime-tokio-rustls", "sqlx-sqlite"].into_iter().collect::<toml_edit::Array>().into(),
-            );
-            dependency
-        });
         dependencies["thiserror"] = value("2");
         dependencies["tower-sessions"] = value("0.14");
         dependencies["tower-sessions-sqlx-store"] = value({
@@ -146,6 +152,9 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
     manifest["dev-dependencies"]["tempfile"] = value("3");
     fs::write(manifest_path, manifest.to_string())?;
     STARTER.extract(path).context("extract the application starter")?;
+    let database_directory = path.join("database");
+    fs::create_dir_all(&database_directory)?;
+    fs::write(database_directory.join("database.sqlite"), [])?;
     if let Some(frontend) = frontend {
         FRONTEND.extract(path).context("extract the Inertia starter")?;
         match frontend {

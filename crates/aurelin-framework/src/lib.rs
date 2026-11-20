@@ -5,6 +5,7 @@
 
 pub mod auth;
 pub mod configuration;
+pub mod database;
 pub mod http;
 pub mod mail;
 pub mod queue;

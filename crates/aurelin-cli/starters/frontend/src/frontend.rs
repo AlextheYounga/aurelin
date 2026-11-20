@@ -7,14 +7,14 @@ use aurelin_framework::{
 };
 use vite_rs_axum_0_8::ViteServe;
 
-use crate::frontend_config::{
+use crate::config::frontend::{
     CONFIRM_PASSWORD_COMPONENT, DASHBOARD_COMPONENT, FORGOT_PASSWORD_COMPONENT, LOGIN_COMPONENT,
     REGISTER_COMPONENT, RESET_PASSWORD_COMPONENT, TWO_FACTOR_CHALLENGE_COMPONENT,
     VERIFY_EMAIL_COMPONENT,
 };
 
 #[cfg(debug_assertions)]
-use crate::frontend_config::{DEV_SCRIPT, FRAMEWORK};
+use crate::config::frontend::{DEV_SCRIPT, FRAMEWORK};
 
 #[cfg(not(debug_assertions))]
 const PAGE_MARKER: &str = "__AURELIN_INERTIA_PAGE__";

@@ -198,6 +198,17 @@ Generated applications keep reusable behavior in a library target and a thin
 binary entry point. All Rust tests live in each crate's root `tests/` directory;
 production `src/` trees contain no inline test modules or test-only seams.
 
+### Application console
+
+Generated projects expose their application commands through the visible Cargo
+alias `cargo aurelin`. The application-owned registry lives in `src/console/`
+because it selects that application's migrations and custom commands. Reusable
+migration execution lives in `aurelin-framework` and uses the mapped
+`sea-orm-migration` stack. Running `cargo aurelin` lists only the generated
+application's commands; `dev`, `serve`, migration commands, and `queue:work`
+remain explicit operations. This follows Laravel 13's Artisan command and
+migration workflows while using static Rust command registration.
+
 ### Queue foundation
 
 Laravel Framework owns queue dispatch and worker behavior, so Aurelin keeps its
@@ -207,8 +218,8 @@ framework prepares Apalis's durable SQLite storage and exposes its native job
 sink and worker types rather than inventing a second queue API.
 
 Generated applications own their serializable job types and handlers. The
-starter includes an example job, a dispatch function, and a `cargo run --
-worker` process using the same `DATABASE_URL` as the application. Generated
+starter includes an example job, a dispatch function, and a `cargo aurelin
+queue:work` process using the same `DATABASE_URL` as the application. Generated
 application tests dispatch through SQLite and process the job through a real
 worker. Retry policy, exhausted-job reporting, a separate Laravel-shaped
 `failed_jobs` store, and additional queue drivers remain future parity work.
