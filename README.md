@@ -1,71 +1,125 @@
 # Aurelin
 
-Aurelin is an early Rust framework ecosystem modeled on Laravel 13. It combines
-existing Rust crates and frontend packages into a recognizable application
-workflow rather than reimplementing their underlying functionality.
+**A productive web application framework for Rust, inspired by Laravel.**
 
-## Current state
+Aurelin brings proven application conventions to Rust without replacing the
+ecosystem that already works. Axum handles HTTP. SeaORM handles application
+data. Inertia connects the backend to React or Vue. Aurelin makes those parts
+work together as one coherent framework.
 
-The repository currently provides foundational, tested behavior:
+The goal is simple: start with a complete application, not a collection of
+integration decisions.
 
-- creation of a Cargo application from an embedded starter;
-- `.env` and typed listener configuration;
-- Axum routes and Tokio HTTP serving;
-- a health endpoint and graceful shutdown;
-- an Inertia 3 Axum integration verified at the protocol boundary;
-- framework-owned authentication primitives and a separate headless
-  `aurelin-fortify` package;
-- minimal React 19 and Vue 3 Inertia starters with Vite development and
-  embedded production assets;
-- a shared SQLite authentication foundation with registration, login, logout,
-  remember-me sessions, login throttling, CSRF protection, persisted sessions,
-  password reset, email verification, password confirmation, two-factor
-  authentication, passkeys, account settings, and SMTP mail delivery.
+> [!IMPORTANT]
+> Aurelin is under active development and has not yet been published to
+> crates.io. The current release is suitable for exploring and contributing,
+> but is not yet recommended for production applications.
 
-The authentication starter now covers the principal built-in Laravel 13 React
-and Vue flows, but it is not yet a complete parity claim. See `CONTEXT.md` for
-the target, `docs/ROADMAP.md` for progress and remaining milestones, and
-`docs/ARCHITECTURE.md` for exact implementation status and intentional scope
-exclusions.
+## What you get
 
-## Try the backend foundation
+- Axum routing and Tokio HTTP serving
+- Typed environment configuration
+- Graceful shutdown and health checks
+- Inertia 3 integration for React 19 and Vue 3
+- Vite development and embedded production assets
+- SQLite persistence with SeaORM
+- Persisted sessions and CSRF protection
+- Registration, login, logout, and remember-me authentication
+- Login throttling and password confirmation
+- Password reset and email verification
+- Two-factor authentication and recovery codes
+- Passkey registration and authentication
+- Account and profile settings
+- SMTP mail delivery
 
-Until the crates are published, pass the local framework path explicitly:
+Authentication is split deliberately between reusable packages and generated
+application code. Aurelin provides the secure workflows and contracts; your
+application owns its users, database models, migrations, policies, mail
+content, and interface.
+
+## Quick start
+
+Clone the repository, then generate a React application:
 
 ```sh
 cargo run -p aurelin-cli -- new /tmp/my-aurelin-app \
-  --framework-path "$PWD/crates/aurelin-framework"
-cd /tmp/my-aurelin-app
-cargo run
-```
-
-Then open <http://127.0.0.1:8000>. This command creates a backend-only starter;
-it does not imply that a finished Laravel-equivalent starter kit exists.
-
-To exercise one of the frontend foundations:
-
-```sh
-cargo run -p aurelin-cli -- new /tmp/my-aurelin-react-app \
   --framework-path "$PWD/crates/aurelin-framework" \
   --frontend react
-cd /tmp/my-aurelin-react-app
+
+cd /tmp/my-aurelin-app
 npm install
 cargo run
 ```
 
-Use `--frontend vue` for Vue. Both variants provide the same backend behavior
-and authentication workflow.
+Open <http://127.0.0.1:8000> and register an account.
 
-Generate shell completion output with, for example:
+Use `--frontend vue` for Vue, or omit `--frontend` to generate a backend-only
+application:
 
 ```sh
-cargo run -p aurelin-cli -- completions bash
+cargo run -p aurelin-cli -- new /tmp/my-aurelin-api \
+  --framework-path "$PWD/crates/aurelin-framework"
 ```
 
-## Develop Aurelin
+The `--framework-path` option is temporary. Once the Aurelin crates are
+published, generated applications will use their registry versions directly.
+
+## The Aurelin approach
+
+Rust has excellent web libraries. Aurelin does not hide or duplicate them. It
+chooses a well-matched stack, supplies the missing application conventions,
+and gives each concern a clear home.
+
+| Concern | Aurelin choice |
+|---|---|
+| HTTP and middleware | Axum and Tower |
+| Async runtime | Tokio |
+| Data and migrations | SeaORM |
+| Server-driven frontend | Inertia |
+| Sessions | tower-sessions |
+| Mail | lettre |
+| Passkeys | webauthn-rs |
+| Frontend | React or Vue with Vite |
+
+Applications still use these libraries through their native APIs. Aurelin is
+the convention and integration layer, not a second abstraction over
+everything beneath it.
+
+## Packages
+
+| Package | Responsibility |
+|---|---|
+| `aurelin-framework` | Core configuration, HTTP, sessions, mail, encryption, signed URLs, rate limiting, and authentication primitives |
+| `aurelin-fortify` | Headless authentication workflows and Axum integration |
+| `aurelin-passkeys` | WebAuthn registration and authentication ceremonies |
+| `aurelin-cli` | Application generation and shell completions |
+
+## Project status
+
+The authentication starter covers the principal Laravel 13 React and Vue
+flows, but Aurelin does not yet claim complete Laravel parity.
+
+- [`CONTEXT.md`](CONTEXT.md) defines the target and project constraints.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) tracks completed and planned work.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) explains package ownership and
+  intentional scope boundaries.
+- [`docs/crate-mapping.md`](docs/crate-mapping.md) records the selected Rust
+  ecosystem components.
+
+## Development
+
+Run the complete validation suite from the repository root:
 
 ```sh
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
+
+Generate shell completions with:
+
+```sh
+cargo run -p aurelin-cli -- completions bash
+```
+
+Replace `bash` with another shell supported by `clap_complete`.
