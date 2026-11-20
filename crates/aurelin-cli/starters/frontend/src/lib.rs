@@ -14,6 +14,7 @@ mod database;
 mod entities;
 pub mod frontend;
 pub mod frontend_config;
+pub mod jobs;
 mod migration;
 pub mod password_policy;
 pub mod routes;
@@ -29,6 +30,17 @@ pub async fn run() -> Result<(), Box<dyn Error>> {
         .get("DATABASE_URL")
         .map(String::as_str)
         .unwrap_or("sqlite://database.sqlite?mode=rwc");
+    match std::env::args().nth(1).as_deref() {
+        Some("worker") => return jobs::work(database_url).await,
+        Some(command) => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("unknown command `{command}`; expected `worker`"),
+            )
+            .into());
+        }
+        None => {}
+    }
     let secure_cookie = environment
         .get("SESSION_SECURE_COOKIE")
         .map(String::as_str)

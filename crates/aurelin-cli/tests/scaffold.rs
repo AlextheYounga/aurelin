@@ -63,6 +63,31 @@ fn wrong_framework_crate_is_rejected_before_project_creation() -> TestResult {
 }
 
 #[test]
+fn generated_projects_use_published_aurelin_versions_by_default() -> TestResult {
+    let directory = TempDir::new()?;
+    let destination = directory.path().join("app");
+    let result = Command::new(env!("CARGO_BIN_EXE_aurelin"))
+        .args(["new", "--no-interaction"])
+        .arg(&destination)
+        .args(["--frontend", "react"])
+        .output()?;
+    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    let manifest = fs::read_to_string(destination.join("Cargo.toml"))?;
+    assert!(manifest.contains(r#"aurelin-framework = { version = "0.1.0" }"#));
+    assert!(manifest.contains(r#"aurelin-fortify = { version = "0.1.0" }"#));
+    assert!(!manifest.contains("aurelin-framework = { path"));
+    Ok(())
+}
+
+#[test]
+fn non_interactive_generation_requires_a_destination() -> TestResult {
+    let result = Command::new(env!("CARGO_BIN_EXE_aurelin")).args(["new", "--no-interaction"]).output()?;
+    assert!(!result.status.success());
+    assert!(String::from_utf8(result.stderr)?.contains("destination is required"));
+    Ok(())
+}
+
+#[test]
 fn help_version_and_completion_commands_work() -> TestResult {
     for arguments in [vec!["--help"], vec!["--version"], vec!["new", "--help"], vec!["completions", "bash"]] {
         let result = Command::new(env!("CARGO_BIN_EXE_aurelin")).args(&arguments).output()?;

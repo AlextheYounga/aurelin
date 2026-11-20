@@ -198,6 +198,21 @@ Generated applications keep reusable behavior in a library target and a thin
 binary entry point. All Rust tests live in each crate's root `tests/` directory;
 production `src/` trees contain no inline test modules or test-only seams.
 
+### Queue foundation
+
+Laravel Framework owns queue dispatch and worker behavior, so Aurelin keeps its
+reusable queue integration in `aurelin-framework`. The initial integration uses
+the mapped Apalis stack with `apalis` 1.1.1 and `apalis-sqlite` 1.1.1. The
+framework prepares Apalis's durable SQLite storage and exposes its native job
+sink and worker types rather than inventing a second queue API.
+
+Generated applications own their serializable job types and handlers. The
+starter includes an example job, a dispatch function, and a `cargo run --
+worker` process using the same `DATABASE_URL` as the application. Generated
+application tests dispatch through SQLite and process the job through a real
+worker. Retry policy, exhausted-job reporting, a separate Laravel-shaped
+`failed_jobs` store, and additional queue drivers remain future parity work.
+
 ## Growth rule
 
 Add dependencies and framework behavior only for the capability currently

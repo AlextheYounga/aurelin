@@ -33,3 +33,10 @@ authentication, passkeys, CSRF protection, and throttling.
 Mail is logged locally by default. For production delivery, set
 `MAIL_MAILER=smtp` and configure `MAIL_HOST`, `MAIL_PORT`, `MAIL_ENCRYPTION`,
 `MAIL_FROM_ADDRESS`, and optional SMTP credentials in `.env`.
+
+Define background jobs in `src/jobs.rs`. The application uses the same SQLite
+database for its default durable queue. Run a worker in another terminal with:
+
+```sh
+cargo run -- worker
+```

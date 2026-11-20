@@ -12,8 +12,13 @@ listener, and press Ctrl+C to shut down gracefully.
 Define HTTP routes in `src/routes/http.rs`. Compose routes, Axum state, and
 middleware in `src/bootstrap.rs`. Run `cargo test` to exercise your app.
 
+Define background jobs in `src/jobs.rs`, dispatch them through the SQLite queue,
+and run a worker in another terminal:
+
+```sh
+cargo run -- worker
+```
+
 This is the backend foundation, not the finished Vue/React authentication
 starter. Sessions, CSRF, database access, frontend assets, and authentication
 have not been installed. HTTP routes do not yet have Laravel's `web` middleware.
-
-The framework dependency points to a local checkout until Aurelin is published.

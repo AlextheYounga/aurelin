@@ -1,4 +1,8 @@
-use std::{fs, path::Path, process::Command};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::{Context, Result, bail};
 use clap::ValueEnum;
@@ -6,10 +10,10 @@ use include_dir::{Dir, include_dir};
 use rand::{Rng, distr::Alphanumeric};
 use toml_edit::{DocumentMut, InlineTable, value};
 
-static STARTER: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/starters/base");
-static FRONTEND: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/starters/frontend");
-static REACT: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/starters/react");
-static VUE: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/starters/vue");
+static STARTER: Dir<'_> = include_dir!("$OUT_DIR/starters/base");
+static FRONTEND: Dir<'_> = include_dir!("$OUT_DIR/starters/frontend");
+static REACT: Dir<'_> = include_dir!("$OUT_DIR/starters/react");
+static VUE: Dir<'_> = include_dir!("$OUT_DIR/starters/vue");
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
 pub enum Frontend {
@@ -17,17 +21,30 @@ pub enum Frontend {
     Vue,
 }
 
-pub fn create(path: &Path, framework_path: &Path, name: Option<&str>, frontend: Option<Frontend>) -> Result<()> {
-    let framework = framework_path.canonicalize().context("locate the aurelin-framework crate")?;
-    let manifest = fs::read_to_string(framework.join("Cargo.toml"))
-        .context("read the aurelin-framework manifest")?
-        .parse::<DocumentMut>()
-        .context("parse the aurelin-framework manifest")?;
-    if manifest["package"]["name"].as_str() != Some("aurelin-framework") {
-        bail!("--framework-path must point to the aurelin-framework crate");
-    }
-    let framework = framework.to_str().context("framework path must be valid Unicode")?;
+#[derive(Debug)]
+pub enum FrameworkSource {
+    Registry,
+    Path(PathBuf),
+}
 
+impl FrameworkSource {
+    pub fn resolve(path: Option<PathBuf>) -> Result<Self> {
+        let Some(path) = path else {
+            return Ok(Self::Registry);
+        };
+        let framework = path.canonicalize().context("locate the aurelin-framework crate")?;
+        let manifest = fs::read_to_string(framework.join("Cargo.toml"))
+            .context("read the aurelin-framework manifest")?
+            .parse::<DocumentMut>()
+            .context("parse the aurelin-framework manifest")?;
+        if manifest["package"]["name"].as_str() != Some("aurelin-framework") {
+            bail!("--framework-path must point to the aurelin-framework crate");
+        }
+        Ok(Self::Path(framework))
+    }
+}
+
+pub fn create(path: &Path, framework: &FrameworkSource, name: Option<&str>, frontend: Option<Frontend>) -> Result<()> {
     // Cargo owns project-name validation and refuses existing destinations.
     // Never use `cargo init`, which would adopt an existing directory.
     let mut cargo = Command::new("cargo");
@@ -45,22 +62,14 @@ pub fn create(path: &Path, framework_path: &Path, name: Option<&str>, frontend: 
     })
 }
 
-fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<()> {
+fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>) -> Result<()> {
     let manifest_path = path.join("Cargo.toml");
     let mut manifest = fs::read_to_string(&manifest_path)?.parse::<DocumentMut>()?;
     let crate_name = manifest["package"]["name"].as_str().context("generated package has no name")?.replace('-', "_");
     let dependencies = &mut manifest["dependencies"];
-    let mut aurelin = InlineTable::new();
-    aurelin.insert("path", framework.into());
-    dependencies["aurelin-framework"] = value(aurelin);
+    dependencies["aurelin-framework"] = value(aurelin_dependency(framework, "aurelin-framework")?);
     if frontend.is_some() {
-        let fortify_path = Path::new(framework)
-            .parent()
-            .context("framework crate must have a parent directory")?
-            .join("aurelin-fortify");
-        let mut fortify = InlineTable::new();
-        fortify.insert("path", fortify_path.to_str().context("aurelin-fortify path must be valid Unicode")?.into());
-        dependencies["aurelin-fortify"] = value(fortify);
+        dependencies["aurelin-fortify"] = value(aurelin_dependency(framework, "aurelin-fortify")?);
     }
     let mut tokio = InlineTable::new();
     tokio.insert("version", "1".into());
@@ -72,16 +81,16 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
     dependencies["tracing"] = value("0.1");
     dependencies["tracing-subscriber"] = value("0.3");
     dependencies["serde_json"] = value("1");
+    dependencies["serde"] = value({
+        let mut dependency = InlineTable::new();
+        dependency.insert("version", "1".into());
+        dependency.insert("features", ["derive"].into_iter().collect::<toml_edit::Array>().into());
+        dependency
+    });
     if frontend.is_some() {
         dependencies["axum-login"] = value("0.18");
         dependencies["axum-tower-sessions-csrf"] = value("=0.1.1");
         dependencies["axum-valid"] = value("0.25");
-        dependencies["serde"] = value({
-            let mut dependency = InlineTable::new();
-            dependency.insert("version", "1".into());
-            dependency.insert("features", ["derive"].into_iter().collect::<toml_edit::Array>().into());
-            dependency
-        });
         dependencies["sea-orm"] = value({
             let mut dependency = InlineTable::new();
             dependency.insert("version", "1.1".into());
@@ -134,6 +143,7 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
     tower.insert("version", "0.5".into());
     tower.insert("features", ["util"].into_iter().collect::<toml_edit::Array>().into());
     manifest["dev-dependencies"]["tower"] = value(tower);
+    manifest["dev-dependencies"]["tempfile"] = value("3");
     fs::write(manifest_path, manifest.to_string())?;
     STARTER.extract(path).context("extract the application starter")?;
     if let Some(frontend) = frontend {
@@ -148,6 +158,7 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
         path.join("tests/application.rs"),
         path.join("tests/authentication.rs"),
         path.join("tests/email_verification.rs"),
+        path.join("tests/jobs.rs"),
         path.join("tests/mail_delivery.rs"),
         path.join("tests/password_reset.rs"),
         path.join("tests/password_policy.rs"),
@@ -170,4 +181,18 @@ fn install(path: &Path, framework: &str, frontend: Option<Frontend>) -> Result<(
     }
     fs::write(path.join(".env"), environment)?;
     Ok(())
+}
+
+fn aurelin_dependency(source: &FrameworkSource, package: &str) -> Result<InlineTable> {
+    let mut dependency = InlineTable::new();
+    dependency.insert("version", env!("CARGO_PKG_VERSION").into());
+    if let FrameworkSource::Path(framework) = source {
+        let path = if package == "aurelin-framework" {
+            framework.clone()
+        } else {
+            framework.parent().context("framework crate must have a parent directory")?.join(package)
+        };
+        dependency.insert("path", path.to_str().context("Aurelin crate path must be valid Unicode")?.into());
+    }
+    Ok(dependency)
 }

@@ -7,7 +7,10 @@ Rust framework. Checked items are implemented and verified at the relevant
 public boundary. Unchecked items remain planned and do not imply a delivery
 date or a Laravel-wide parity claim.
 
-This roadmap tracks framework and application-development capabilities.
+The immediate product target is a guided `aurelin new` experience that produces
+a runnable React or Vue application with authentication, SQLite persistence,
+and queue/job support. That experience gates Aurelin's initial usable release;
+the broader framework capabilities remain tracked after it.
 
 ## Settled direction
 
@@ -20,6 +23,74 @@ This roadmap tracks framework and application-development capabilities.
 - [x] Keep Svelte, Livewire, Blade, WorkOS authentication, and teams out of
       scope.
 - [x] Defer Inertia SSR to a later milestone.
+
+## Initial usable release
+
+The release is complete when a developer can install Aurelin, run
+`aurelin new`, answer a short walkthrough, and receive a working application
+without referring to the Aurelin source checkout. The generated application
+must include the selected React or Vue frontend, the built-in authentication
+experience, SQLite persistence, and a usable queue worker and job workflow.
+
+### Installable CLI and published dependencies
+
+- [x] Add crates.io package metadata to every Aurelin crate.
+- [x] Give publishable Aurelin path dependencies registry version
+      requirements while preserving local workspace development.
+- [x] Publish the initial 0.1.0 versions of `aurelin-framework`,
+      `aurelin-passkeys`, `aurelin-fortify`, and `aurelin-cli`.
+- [ ] Publish a coordinated release containing guided generation and queue
+      support in dependency order.
+- [ ] Install the released CLI with `cargo install aurelin-cli` on a clean
+      machine or equivalent isolated environment.
+- [x] Generate registry dependencies by default instead of requiring
+      `--framework-path`.
+- [x] Retain an explicit local-path override for Aurelin framework development.
+- [x] Prevent ignored development artifacts such as starter `node_modules`
+      directories from being embedded in the CLI package or generated output.
+
+### Guided application creation
+
+- [x] Make `aurelin new <path>` start an interactive walkthrough when required
+      choices were not supplied as command-line options.
+- [ ] Let the walkthrough select React or Vue and confirm the application
+      features included in the generated project.
+- [x] Keep equivalent non-interactive options for scripts and continuous
+      integration.
+- [ ] Feed interactive and non-interactive choices into one typed generation
+      configuration rather than maintaining separate scaffold paths.
+- [x] Generate a React or Vue application with the built-in authentication
+      experience.
+- [x] Configure SQLite and run the authentication schema migrations for a new
+      application.
+- [x] Print concise next steps that are accurate for the generated choices.
+
+### Queue and job workflow
+
+- [x] Establish the Laravel 13 queue behavior and extension boundary to
+      translate, then verify the selected Apalis capabilities against it.
+- [ ] Provide framework-owned queue configuration, dispatch, worker, retry,
+      and failure conventions over Apalis.
+- [x] Configure a SQLite-backed queue by default in generated applications.
+- [ ] Provide the required queue and failed-job schema through generated
+      application migrations.
+- [x] Give generated applications an application-owned job definition and a
+      clear way to run a worker.
+- [x] Verify successful dispatch and execution through a generated
+      application's real queue and worker boundary.
+- [ ] Verify retries, exhausted jobs, and failed-job recording without losing
+      unrelated queued work.
+
+### Release acceptance
+
+- [ ] From an installed `aurelin` binary, complete the walkthrough in a clean
+      environment without access to the Aurelin repository.
+- [ ] Start the generated application, register and authenticate a user, and
+      persist that user in SQLite.
+- [ ] Dispatch a generated application job, process it with a worker, and
+      observe its intended application-visible result.
+- [ ] Compile, lint, test, and typecheck the generated React and Vue variants
+      using only their declared registry and frontend dependencies.
 
 ## 1. Application foundation
 
@@ -219,9 +290,10 @@ does not by itself complete a capability.
 - [ ] Match Laravel's observable cache expiration and mutation behavior.
 - [ ] Implement atomic cache locks and required Laravel cache semantics.
 
-### Queues and scheduling
+### Scheduling
 
-- [ ] Implement queues, retries, failed jobs, and workers with `apalis`.
+- Queue and worker support is part of the initial usable release milestone
+  above.
 - [ ] Implement scheduled tasks and overlap prevention.
 
 ### Notifications and mail

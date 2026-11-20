@@ -7,6 +7,7 @@ pub mod auth;
 pub mod configuration;
 pub mod http;
 pub mod mail;
+pub mod queue;
 pub mod session;
 pub mod signed_url;
 pub mod timebox;

@@ -11,9 +11,10 @@ The goal is simple: start with a complete application, not a collection of
 integration decisions.
 
 > [!IMPORTANT]
-> Aurelin is under active development and has not yet been published to
-> crates.io. The current release is suitable for exploring and contributing,
-> but is not yet recommended for production applications.
+> Aurelin is under active development. Version 0.1.0 is available on crates.io,
+> while this branch contains unreleased guided-generation and queue work. It is
+> suitable for exploring and contributing, but is not yet recommended for
+> production applications.
 
 ## What you get
 
@@ -31,6 +32,7 @@ integration decisions.
 - Passkey registration and authentication
 - Account and profile settings
 - SMTP mail delivery
+- SQLite-backed background jobs and workers
 
 Authentication is split deliberately between reusable packages and generated
 application code. Aurelin provides the secure workflows and contracts; your
@@ -39,7 +41,8 @@ content, and interface.
 
 ## Quick start
 
-Clone the repository, then generate a React application:
+Until the next coordinated crate release, clone the repository and generate a
+React application against its matching local framework source:
 
 ```sh
 cargo run -p aurelin-cli -- new /tmp/my-aurelin-app \
@@ -61,8 +64,8 @@ cargo run -p aurelin-cli -- new /tmp/my-aurelin-api \
   --framework-path "$PWD/crates/aurelin-framework"
 ```
 
-The `--framework-path` option is temporary. Once the Aurelin crates are
-published, generated applications will use their registry versions directly.
+The `--framework-path` option keeps unreleased CLI and framework changes on the
+same version. Released CLI versions generate registry dependencies directly.
 
 ## The Aurelin approach
 
