@@ -1,6 +1,6 @@
 [package]
 name = "aurelin-fortify"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 authors.workspace = true
 description.workspace = true
@@ -8,8 +8,8 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-aurelin-framework = { version = "0.2.3", path = "../aurelin-framework" }
-aurelin-passkeys = { version = "0.2.3", path = "../aurelin-passkeys" }
+aurelin-framework = { version = "0.3.0", path = "../aurelin-framework" }
+aurelin-passkeys = { version = "0.3.0", path = "../aurelin-passkeys" }
 axum-login = "0.18"
 axum-tower-sessions-csrf = "=0.1.1"
 axum-valid = "0.25"
