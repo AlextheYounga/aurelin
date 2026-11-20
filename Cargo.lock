@@ -342,7 +342,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "aurelin-cli"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -356,7 +356,7 @@ dependencies = [
 
 [[package]]
 name = "aurelin-fortify"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "aurelin-framework",
  "aurelin-passkeys",
@@ -378,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "aurelin-framework"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "aes-gcm 0.10.3",
  "apalis",
@@ -410,7 +410,7 @@ dependencies = [
 
 [[package]]
 name = "aurelin-passkeys"
-version = "0.2.3"
+version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
  "hmac 0.12.1",
