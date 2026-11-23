@@ -23,7 +23,7 @@ pub mod config;
 #[cfg(feature = "ssr")]
 pub mod console;
 #[cfg(feature = "ssr")]
-mod database;
+pub mod database;
 #[cfg(feature = "ssr")]
 mod entities;
 #[cfg(feature = "ssr")]

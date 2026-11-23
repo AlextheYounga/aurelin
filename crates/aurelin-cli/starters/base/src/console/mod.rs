@@ -41,6 +41,38 @@ enum Command {
     /// Process queued jobs
     #[command(name = "queue:work")]
     QueueWork,
+    /// List failed queue jobs
+    #[command(name = "queue:failed")]
+    QueueFailed {
+        /// Only list failures from this queue
+        #[arg(long)]
+        queue: Option<String>,
+    },
+    /// Retry failed queue jobs
+    #[command(name = "queue:retry")]
+    QueueRetry {
+        #[arg(num_args = 1..)]
+        ids: Vec<String>,
+    },
+    /// Delete failed queue jobs
+    #[command(name = "queue:forget")]
+    QueueForget {
+        #[arg(num_args = 1..)]
+        ids: Vec<String>,
+    },
+    /// Delete all matching failed queue jobs
+    #[command(name = "queue:flush")]
+    QueueFlush {
+        /// Retain jobs that failed within this many hours
+        #[arg(long)]
+        hours: Option<u64>,
+        /// Only delete failures from this queue
+        #[arg(long)]
+        queue: Option<String>,
+        /// Run the command in production
+        #[arg(long)]
+        force: bool,
+    },
 }
 
 pub async fn run(environment: HashMap<String, String>) -> Result<(), Box<dyn Error>> {
@@ -67,6 +99,35 @@ pub async fn run(environment: HashMap<String, String>) -> Result<(), Box<dyn Err
             crate::database::fresh(database_url(&environment)).await
         }
         Some(Command::QueueWork) => crate::jobs::work(database_url(&environment)).await,
+        Some(Command::QueueFailed { queue }) => {
+            aurelin_framework::queue::commands::failed(database_url(&environment), queue.as_deref())
+                .await
+                .map_err(Into::into)
+        }
+        Some(Command::QueueRetry { ids }) => {
+            aurelin_framework::queue::commands::retry(database_url(&environment), &ids)
+                .await
+                .map_err(Into::into)
+        }
+        Some(Command::QueueForget { ids }) => {
+            aurelin_framework::queue::commands::forget(database_url(&environment), &ids)
+                .await
+                .map_err(Into::into)
+        }
+        Some(Command::QueueFlush {
+            hours,
+            queue,
+            force,
+        }) => {
+            ensure_safe_queue_flush(&environment, force)?;
+            aurelin_framework::queue::commands::flush(
+                database_url(&environment),
+                hours,
+                queue.as_deref(),
+            )
+            .await
+            .map_err(Into::into)
+        }
     }
 }
 
@@ -76,6 +137,16 @@ fn ensure_safe_environment(
 ) -> Result<(), Box<dyn Error>> {
     if environment.get("APP_ENV").map(String::as_str) == Some("production") && !force {
         return Err("refusing to run migrations in production without --force".into());
+    }
+    Ok(())
+}
+
+fn ensure_safe_queue_flush(
+    environment: &HashMap<String, String>,
+    force: bool,
+) -> Result<(), Box<dyn Error>> {
+    if environment.get("APP_ENV").map(String::as_str) == Some("production") && !force {
+        return Err("refusing to flush failed jobs in production without --force".into());
     }
     Ok(())
 }

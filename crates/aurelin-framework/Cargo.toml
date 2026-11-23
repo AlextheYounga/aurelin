@@ -1,6 +1,6 @@
 [package]
 name = "aurelin-framework"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 authors.workspace = true
 description.workspace = true
@@ -31,8 +31,10 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 sea-orm = { version = "1.1", default-features = false, features = ["runtime-tokio-rustls", "sqlx-sqlite"] }
 sea-orm-migration = { version = "1.1", default-features = false, features = ["runtime-tokio-rustls", "sqlx-sqlite"] }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 sha1 = "0.11"
 sha2 = "0.10"
+sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite"] }
 thiserror = "2"
 tokio = { version = "1", features = ["rt", "sync", "time"] }
 tower-sessions = "0.14"
@@ -42,7 +44,6 @@ tracing = "0.1"
 workspace = true
 
 [dev-dependencies]
-serde_json = "1"
 tower = { version = "0.5", features = ["util"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util"] }
 tempfile = "3"

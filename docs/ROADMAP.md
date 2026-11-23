@@ -1,6 +1,6 @@
 # Aurelin Roadmap
 
-Last updated: 2026-11-19
+Last updated: 2026-11-23
 
 This checklist tracks Aurelin's progress toward a cohesive Laravel 13-inspired
 Rust framework. Checked items are implemented and verified at the relevant
@@ -72,14 +72,14 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [ ] Provide framework-owned queue configuration, dispatch, worker, retry,
       and failure conventions over Apalis.
 - [x] Configure a SQLite-backed queue by default in generated applications.
-- [ ] Provide the required queue and failed-job schema through generated
-      application migrations.
+- [x] Provide the required queue schema through generated application
+      migrations and retain exhausted jobs in the durable Apalis job store.
 - [x] Give generated applications an application-owned job definition and a
       clear way to run a worker.
 - [x] Verify successful dispatch and execution through a generated
       application's real queue and worker boundary.
-- [ ] Verify retries, exhausted jobs, and failed-job recording without losing
-      unrelated queued work.
+- [x] Verify retries, exhausted jobs, failed-job operations, and continued
+      processing of unrelated queued work.
 
 ### Release acceptance
 

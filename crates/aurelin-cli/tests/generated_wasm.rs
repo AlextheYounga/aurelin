@@ -15,6 +15,9 @@ fn generated_wasm_project_compiles_for_server_and_browser() -> Result<(), Box<dy
         .args(["--frontend", "wasm"])
         .output()?;
     assert!(create.status.success(), "{}", String::from_utf8_lossy(&create.stderr));
+    let next_steps = String::from_utf8_lossy(&create.stderr);
+    assert!(next_steps.contains("cargo leptos watch"));
+    assert!(!next_steps.contains("npm install"));
 
     assert!(!destination.join("package.json").exists());
     assert!(!destination.join("vite.config.ts").exists());

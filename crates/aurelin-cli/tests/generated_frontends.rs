@@ -58,8 +58,19 @@ fn react_and_vue_projects_compile_and_test_their_inertia_boundaries() -> Result<
             Command::new("cargo").arg("aurelin").env("CARGO_TARGET_DIR", &target).current_dir(&destination).output()?;
         assert!(commands.status.success(), "{}", String::from_utf8_lossy(&commands.stderr));
         let commands = String::from_utf8(commands.stdout)?;
-        for command in ["dev", "serve", "migrate", "migrate:status", "migrate:rollback", "migrate:fresh", "queue:work"]
-        {
+        for command in [
+            "dev",
+            "serve",
+            "migrate",
+            "migrate:status",
+            "migrate:rollback",
+            "migrate:fresh",
+            "queue:work",
+            "queue:failed",
+            "queue:retry",
+            "queue:forget",
+            "queue:flush",
+        ] {
             assert!(commands.contains(command), "missing `{command}` from:\n{commands}");
         }
 

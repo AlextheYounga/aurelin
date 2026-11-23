@@ -15,6 +15,7 @@ async fn application_job_is_dispatched_and_processed_by_a_worker() -> Result<(),
         "sqlite://{}/queue.sqlite?mode=rwc",
         directory.path().display()
     );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     __AURELIN_CRATE__::jobs::dispatch(
         &database_url,
         __AURELIN_CRATE__::jobs::ExampleJob {

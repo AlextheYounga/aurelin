@@ -1,11 +1,17 @@
 mod scaffold;
 
-use std::{io, io::IsTerminal, path::PathBuf, process::ExitCode};
+use std::{
+    io,
+    io::IsTerminal,
+    path::{Path, PathBuf},
+    process::ExitCode,
+};
 
 use anyhow::{Result, bail};
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{Shell, generate};
-use dialoguer::{Input, Select};
+use console::style;
+use dialoguer::{Input, Select, theme::ColorfulTheme};
 
 #[derive(Parser)]
 #[command(name = "aurelin", version, about = "Create Laravel-inspired Rust applications")]
@@ -41,7 +47,7 @@ fn main() -> ExitCode {
     match run(Cli::parse()) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("error: {error:#}");
+            eprintln!("{} {error:#}", style("error:").for_stderr().red().bold());
             ExitCode::FAILURE
         }
     }
@@ -55,16 +61,7 @@ fn run(cli: Cli) -> Result<()> {
             let frontend = select_frontend(frontend, interactive)?;
             let framework = scaffold::FrameworkSource::resolve(framework_path)?;
             scaffold::create(&path, &framework, name.as_deref(), frontend)?;
-            if frontend == Some(scaffold::Frontend::Wasm) {
-                eprintln!("Created {}. Run `cargo aurelin migrate`, then `cargo leptos watch`.", path.display());
-            } else if frontend.is_some() {
-                eprintln!(
-                    "Created {}. Run `npm install`, `cargo aurelin migrate`, then `cargo aurelin dev`.",
-                    path.display()
-                );
-            } else {
-                eprintln!("Created {}. Run `cargo aurelin serve` to start the server.", path.display());
-            }
+            print_next_steps(&path, frontend);
         }
         Commands::Completions { shell } => {
             generate(shell, &mut Cli::command(), "aurelin", &mut io::stdout());
@@ -80,7 +77,8 @@ fn destination(path: Option<PathBuf>, interactive: bool) -> Result<PathBuf> {
     if !interactive {
         bail!("destination is required when not running interactively; use `aurelin new <path>`");
     }
-    let path = Input::<String>::new().with_prompt("Application path").interact_text()?;
+    let theme = ColorfulTheme::default();
+    let path = Input::<String>::with_theme(&theme).with_prompt("Application path").interact_text()?;
     Ok(PathBuf::from(path))
 }
 
@@ -88,11 +86,31 @@ fn select_frontend(frontend: Option<scaffold::Frontend>, interactive: bool) -> R
     if frontend.is_some() || !interactive {
         return Ok(frontend);
     }
+    let theme = ColorfulTheme::default();
     let choices = ["React with authentication", "Vue with authentication", "Rust/WASM with Leptos", "Backend only"];
-    Ok(match Select::new().with_prompt("Application starter").items(&choices).default(0).interact()? {
+    Ok(match Select::with_theme(&theme).with_prompt("Application starter").items(&choices).default(0).interact()? {
         0 => Some(scaffold::Frontend::React),
         1 => Some(scaffold::Frontend::Vue),
         2 => Some(scaffold::Frontend::Wasm),
         _ => None,
     })
+}
+
+fn print_next_steps(path: &Path, frontend: Option<scaffold::Frontend>) {
+    eprintln!("{} Created {}", style("✔").for_stderr().green(), style(path.display()).for_stderr().bold());
+    eprintln!();
+    eprintln!("{}", style("Next steps").for_stderr().cyan().bold());
+    eprintln!("  {} {}", style("cd").for_stderr().cyan(), path.display());
+
+    if frontend == Some(scaffold::Frontend::Wasm) {
+        for command in ["cargo aurelin migrate", "cargo leptos watch"] {
+            eprintln!("  {}", style(command).for_stderr().cyan());
+        }
+    } else if frontend.is_some() {
+        for command in ["npm install", "cargo aurelin migrate", "cargo aurelin dev"] {
+            eprintln!("  {}", style(command).for_stderr().cyan());
+        }
+    } else {
+        eprintln!("  {}", style("cargo aurelin serve").for_stderr().cyan());
+    }
 }

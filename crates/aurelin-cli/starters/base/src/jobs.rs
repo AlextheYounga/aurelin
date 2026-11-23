@@ -1,6 +1,8 @@
 use std::error::Error;
 
-use aurelin_framework::queue::{self, BoxDynError, TaskSink, WorkerBuilder, WorkerContext};
+use aurelin_framework::queue::{
+    self, BoxDynError, TaskBuilder, TaskSink, WorkerBuilder, WorkerContext,
+};
 use serde::{Deserialize, Serialize};
 
 /// Replace this example with an application job of your own.
@@ -11,7 +13,9 @@ pub struct ExampleJob {
 
 pub async fn dispatch(database_url: &str, job: ExampleJob) -> Result<(), Box<dyn Error>> {
     let mut queue = queue::sqlite(database_url).await?;
-    queue.push(job).await?;
+    queue
+        .push_task(TaskBuilder::new(job).max_attempts(1).build())
+        .await?;
     Ok(())
 }
 

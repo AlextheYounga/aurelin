@@ -84,6 +84,19 @@ fn generated_project_builds_tests_and_serves_real_http() -> Result<(), Box<dyn E
     assert!(commands.contains("serve"));
     assert!(commands.contains("migrate"));
     assert!(commands.contains("queue:work"));
+    assert!(commands.contains("queue:failed"));
+    assert!(commands.contains("queue:retry"));
+    assert!(commands.contains("queue:forget"));
+    assert!(commands.contains("queue:flush"));
+
+    let unmigrated_queue = Command::new("cargo")
+        .args(["aurelin", "queue:failed"])
+        .env("CARGO_TARGET_DIR", &target)
+        .current_dir(&destination)
+        .output()?;
+    assert!(!unmigrated_queue.status.success());
+    let unmigrated_queue_error = String::from_utf8(unmigrated_queue.stderr)?;
+    assert!(unmigrated_queue_error.contains("cargo aurelin migrate"), "{unmigrated_queue_error}");
 
     let migrated = Command::new("cargo")
         .args(["aurelin", "migrate"])
@@ -91,7 +104,15 @@ fn generated_project_builds_tests_and_serves_real_http() -> Result<(), Box<dyn E
         .current_dir(&destination)
         .output()?;
     assert!(migrated.status.success(), "{}", String::from_utf8_lossy(&migrated.stderr));
-    assert!(String::from_utf8(migrated.stdout)?.contains("Applied 0 migration(s)."));
+    assert!(String::from_utf8(migrated.stdout)?.contains("Applied 1 migration(s)."));
+
+    let failed_jobs = Command::new("cargo")
+        .args(["aurelin", "queue:failed"])
+        .env("CARGO_TARGET_DIR", &target)
+        .current_dir(&destination)
+        .output()?;
+    assert!(failed_jobs.status.success(), "{}", String::from_utf8_lossy(&failed_jobs.stderr));
+    assert!(String::from_utf8(failed_jobs.stdout)?.contains("No failed jobs found."));
 
     let binary = target.join("debug").join(format!("aurelin-smoke-app{EXE_SUFFIX}"));
     let child = Command::new(&binary)

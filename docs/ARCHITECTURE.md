@@ -254,8 +254,14 @@ Generated applications own their serializable job types and handlers. The
 starter includes an example job, a dispatch function, and a `cargo aurelin
 queue:work` process using the same `DATABASE_URL` as the application. Generated
 application tests dispatch through SQLite and process the job through a real
-worker. Retry policy, exhausted-job reporting, a separate Laravel-shaped
-`failed_jobs` store, and additional queue drivers remain future parity work.
+worker. Queue tables are application-owned migrations, so dispatch and workers
+fail with migration guidance instead of creating schema during startup. Apalis
+persists attempts and terminal failures in its durable job rows; Aurelin exposes
+those rows through `queue:failed`, `queue:retry`, `queue:forget`, and
+`queue:flush`. This deliberately avoids duplicating each terminal job into a
+second Laravel-shaped `failed_jobs` table: retry resets the durable row before a
+worker claims it again. Per-job backoff, worker timeouts, additional queue
+drivers, batching, and chaining remain future parity work.
 
 ## Growth rule
 
