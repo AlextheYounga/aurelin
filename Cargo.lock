@@ -347,6 +347,7 @@ dependencies = [
  "anyhow",
  "clap",
  "clap_complete",
+ "console",
  "dialoguer",
  "include_dir",
  "rand 0.9.5",
