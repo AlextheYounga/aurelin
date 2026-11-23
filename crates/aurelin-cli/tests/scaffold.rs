@@ -89,6 +89,27 @@ fn non_interactive_generation_requires_a_destination() -> TestResult {
 }
 
 #[test]
+fn successful_generation_prints_colored_next_steps_when_color_is_enabled() -> TestResult {
+    let directory = TempDir::new()?;
+    let destination = directory.path().join("app");
+    let result = Command::new(env!("CARGO_BIN_EXE_aurelin"))
+        .args(["new", "--no-interaction"])
+        .arg(&destination)
+        .arg("--framework-path")
+        .arg(framework())
+        .env("CLICOLOR_FORCE", "1")
+        .output()?;
+
+    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    let output = String::from_utf8(result.stderr)?;
+    assert!(output.contains("\u{1b}["));
+    assert!(output.contains("Created"));
+    assert!(output.contains("Next steps"));
+    assert!(output.contains("cargo aurelin serve"));
+    Ok(())
+}
+
+#[test]
 fn help_version_and_completion_commands_work() -> TestResult {
     for arguments in [vec!["--help"], vec!["--version"], vec!["new", "--help"], vec!["completions", "bash"]] {
         let result = Command::new(env!("CARGO_BIN_EXE_aurelin")).args(&arguments).output()?;

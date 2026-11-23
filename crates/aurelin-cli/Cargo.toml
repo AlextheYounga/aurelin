@@ -15,6 +15,7 @@ path = "src/main.rs"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
+console = "0.16"
 dialoguer = { version = "0.12", default-features = false }
 include_dir = "0.7"
 rand = "0.9"
