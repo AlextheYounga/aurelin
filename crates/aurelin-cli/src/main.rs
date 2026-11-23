@@ -16,7 +16,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Create an HTTP application, optionally with the React or Vue authentication starter
+    /// Create an HTTP application, optionally with a browser frontend
     New {
         /// Destination directory; prompted for when omitted in an interactive terminal
         path: Option<PathBuf>,
@@ -26,7 +26,7 @@ enum Commands {
         /// Cargo package name; defaults to the destination directory name
         #[arg(long)]
         name: Option<String>,
-        /// Install a React or Vue Inertia authentication starter
+        /// Install a React, Vue, or full-stack Rust/WASM frontend
         #[arg(long, value_enum)]
         frontend: Option<scaffold::Frontend>,
         /// Never prompt; omitted options use their non-interactive defaults
@@ -55,7 +55,9 @@ fn run(cli: Cli) -> Result<()> {
             let frontend = select_frontend(frontend, interactive)?;
             let framework = scaffold::FrameworkSource::resolve(framework_path)?;
             scaffold::create(&path, &framework, name.as_deref(), frontend)?;
-            if frontend.is_some() {
+            if frontend == Some(scaffold::Frontend::Wasm) {
+                eprintln!("Created {}. Run `cargo aurelin migrate`, then `cargo leptos watch`.", path.display());
+            } else if frontend.is_some() {
                 eprintln!(
                     "Created {}. Run `npm install`, `cargo aurelin migrate`, then `cargo aurelin dev`.",
                     path.display()
@@ -86,10 +88,11 @@ fn select_frontend(frontend: Option<scaffold::Frontend>, interactive: bool) -> R
     if frontend.is_some() || !interactive {
         return Ok(frontend);
     }
-    let choices = ["React with authentication", "Vue with authentication", "Backend only"];
+    let choices = ["React with authentication", "Vue with authentication", "Rust/WASM with Leptos", "Backend only"];
     Ok(match Select::new().with_prompt("Application starter").items(&choices).default(0).interact()? {
         0 => Some(scaffold::Frontend::React),
         1 => Some(scaffold::Frontend::Vue),
+        2 => Some(scaffold::Frontend::Wasm),
         _ => None,
     })
 }

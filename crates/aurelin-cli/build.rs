@@ -18,7 +18,7 @@ fn main() -> io::Result<()> {
     if output.exists() {
         fs::remove_dir_all(&output)?;
     }
-    for starter in ["base", "frontend", "react", "vue"] {
+    for starter in ["base", "authentication", "frontend", "react", "vue", "wasm"] {
         let source = manifest.join("starters").join(starter);
         println!("cargo:rerun-if-changed={}", source.display());
         copy_template(&source, &output.join(starter))?;

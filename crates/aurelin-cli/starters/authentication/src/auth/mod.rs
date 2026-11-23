@@ -21,7 +21,7 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseConnection, DbErr, EntityTrait,
     QueryFilter, sea_query::OnConflict,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::{
@@ -43,7 +43,7 @@ mod two_factor;
 
 pub use settings::ProfileUpdate;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PublicUser {
     pub id: i64,
     pub name: String,
