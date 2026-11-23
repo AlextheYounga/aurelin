@@ -1,9 +1,8 @@
 use std::net::SocketAddr;
 
-use crate::{LOGIN_ATTEMPTS_PER_MINUTE, LoginRateLimiter};
+use crate::LOGIN_ATTEMPTS_PER_MINUTE;
 use aurelin_framework::http as rate_limit;
 use aurelin_framework::{
-    auth::RateLimitOutcome,
     axum::{
         Json, Router,
         extract::{ConnectInfo, State, rejection::JsonRejection},
@@ -11,9 +10,7 @@ use aurelin_framework::{
         routing::{get, post},
     },
     inertia::{Inertia, axum::InertiaRequest},
-    timebox::Timebox,
 };
-use axum_login::AuthUser;
 use axum_tower_sessions_csrf::get_or_create_token;
 use axum_valid::{Valid, ValidationRejection};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -21,9 +18,12 @@ use serde_json::Value;
 use validator::{Validate, ValidationErrors as ValidatorInputErrors};
 
 use super::{
-    AuthSession, CreateUserOutcome, Credentials, FortifyBackend, FortifyFrontend, FortifyHttpError, FortifyUser,
+    AuthSession, FortifyBackend, FortifyFrontend, FortifyHttpError, FortifyUser,
+    authentication_workflow::{
+        LoginAttempt, LoginOutcome, RegistrationAttempt, RegistrationOutcome, attempt_login, attempt_registration,
+        logout,
+    },
     feedback::{FLASH_ERRORS, FLASH_STATUS, ValidationErrors, redirect_with_error},
-    login_session::{PENDING_REMEMBER_LOGIN, set_login_expiry},
 };
 
 #[derive(Serialize)]
@@ -108,7 +108,7 @@ where
         .route("/dashboard", get(dashboard::<F, B>))
         .route("/login", get(login::<F, B>).post(store_login::<B>))
         .route("/register", get(register::<F, B>).post(store_registration::<B>))
-        .route("/logout", post(logout::<B>))
+        .route("/logout", post(store_logout::<B>))
 }
 
 async fn login<F: FortifyFrontend, B: FortifyBackend>(
@@ -170,38 +170,30 @@ async fn store_login<B: FortifyBackend>(
         }
         Err(ValidationRejection::Inner(error)) => return Ok(error.into_response()),
     };
-    if auth.user.is_some() {
-        return Ok(request.redirect(Inertia::redirect("/dashboard"))?);
+    match attempt_login(
+        &mut auth,
+        LoginAttempt {
+            email: input.email,
+            password: input.password,
+            remember: input.remember,
+            ip_address: address.ip(),
+        },
+    )
+    .await?
+    {
+        LoginOutcome::AlreadyAuthenticated | LoginOutcome::Authenticated => {
+            Ok(request.redirect(Inertia::redirect("/dashboard"))?)
+        }
+        LoginOutcome::TwoFactorChallenge => Ok(request.redirect(Inertia::redirect("/two-factor-challenge"))?),
+        LoginOutcome::InvalidCredentials { remaining } => {
+            let mut response = invalid_credentials(&auth, &request).await?;
+            rate_limit::add_rate_limit_headers(&mut response, LOGIN_ATTEMPTS_PER_MINUTE, remaining, None);
+            Ok(response)
+        }
+        LoginOutcome::RateLimited { retry_after } => {
+            Ok(rate_limit::too_many_attempts(LOGIN_ATTEMPTS_PER_MINUTE, retry_after))
+        }
     }
-    let key = LoginRateLimiter::key(&input.email, address.ip());
-    if let Some(retry_after) = auth.backend.login_retry_after(&key).await {
-        return Ok(rate_limit::too_many_attempts(LOGIN_ATTEMPTS_PER_MINUTE, retry_after));
-    }
-    let timebox = Timebox::start(auth.backend.authentication_timebox_duration());
-    let user = auth
-        .authenticate(Credentials { email: input.email, password: input.password })
-        .await
-        .map_err(FortifyHttpError::auth_session)?;
-    let Some(user) = user else {
-        timebox.wait().await;
-        tracing::warn!("authentication failed");
-        let mut response = invalid_credentials(&auth, &request).await?;
-        let remaining = match auth.backend.record_failed_login(&key).await {
-            RateLimitOutcome::Allowed { remaining } => remaining,
-            RateLimitOutcome::Limited { .. } => 0,
-        };
-        rate_limit::add_rate_limit_headers(&mut response, LOGIN_ATTEMPTS_PER_MINUTE, remaining, None);
-        return Ok(response);
-    };
-    if user.two_factor_is_enabled() {
-        auth.session.insert("login.id", user.id()).await?;
-        auth.session.insert(PENDING_REMEMBER_LOGIN, input.remember).await?;
-        return Ok(request.redirect(Inertia::redirect("/two-factor-challenge"))?);
-    }
-    auth.backend.clear_failed_logins(&key).await;
-    auth.login(&user).await.map_err(FortifyHttpError::auth_session)?;
-    set_login_expiry(&auth.session, input.remember);
-    Ok(request.redirect(Inertia::redirect("/dashboard"))?)
 }
 
 async fn invalid_credentials<B: FortifyBackend>(
@@ -228,40 +220,37 @@ async fn store_registration<B: FortifyBackend>(
         }
         Err(ValidationRejection::Inner(error)) => return Ok(error.into_response()),
     };
-    let errors = registration_confirmation_errors(&input);
-    if !errors.is_empty() {
-        auth.session.insert(FLASH_ERRORS, errors).await?;
-        return Ok(request.redirect(Inertia::redirect("/register"))?);
-    }
-    if let Err(message) = auth.backend.validate_password(&input.password).await {
-        return redirect_with_error(&auth, &request, ("password", &message), "/register").await;
-    }
-    let user = match auth
-        .backend
-        .create_user(&input.name, &input.email, &input.password)
-        .await
-        .map_err(FortifyHttpError::backend)?
+    match attempt_registration(
+        &mut auth,
+        RegistrationAttempt {
+            name: input.name,
+            email: input.email,
+            password: input.password,
+            password_confirmation: input.password_confirmation,
+        },
+    )
+    .await?
     {
-        CreateUserOutcome::Created(user) => user,
-        CreateUserOutcome::EmailAlreadyExists => {
+        RegistrationOutcome::AlreadyAuthenticated | RegistrationOutcome::Created => {
+            Ok(request.redirect(Inertia::redirect("/dashboard"))?)
+        }
+        RegistrationOutcome::EmailAlreadyExists => {
             return redirect_with_error(&auth, &request, ("email", "The email has already been taken."), "/register")
                 .await;
         }
-    };
-    auth.backend.send_email_verification(&user).await.map_err(FortifyHttpError::backend)?;
-    auth.login(&user).await.map_err(FortifyHttpError::auth_session)?;
-    tracing::info!(user_id = user.id(), "user registered");
-    Ok(request.redirect(Inertia::redirect("/dashboard"))?)
+        RegistrationOutcome::InvalidInput { field, message } => {
+            redirect_with_error(&auth, &request, (field, &message), "/register").await
+        }
+    }
 }
 
-async fn logout<B: FortifyBackend>(
+async fn store_logout<B: FortifyBackend>(
     mut auth: AuthSession<B>,
     request: InertiaRequest,
 ) -> Result<Response, FortifyHttpError> {
-    if auth.user.is_none() {
+    if !logout(&mut auth).await? {
         return Ok(request.redirect(Inertia::redirect("/login"))?);
     }
-    auth.logout().await.map_err(FortifyHttpError::auth_session)?;
     Ok(request.redirect(Inertia::redirect("/"))?)
 }
 
@@ -296,14 +285,6 @@ fn registration_validation_errors(validation: &ValidatorInputErrors) -> Validati
     }
     if validation.field_errors().contains_key("password") {
         errors.insert("password".into(), "The password must be at least 8 characters.".into());
-    }
-    errors
-}
-
-fn registration_confirmation_errors(input: &RegistrationInput) -> ValidationErrors {
-    let mut errors = ValidationErrors::new();
-    if input.password != input.password_confirmation {
-        errors.insert("password".into(), "The password confirmation does not match.".into());
     }
     errors
 }

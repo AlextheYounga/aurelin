@@ -24,6 +24,7 @@ use crate::passkeys::PasskeyCeremony;
 pub const DEFAULT_AUTHENTICATION_TIMEBOX_DURATION: Duration = Duration::from_millis(200);
 
 mod authentication;
+mod authentication_workflow;
 mod email_verification;
 mod feedback;
 mod login_session;
@@ -32,6 +33,9 @@ mod password_confirmation;
 mod password_reset;
 mod two_factor_authentication;
 
+pub use authentication_workflow::{
+    LoginAttempt, LoginOutcome, RegistrationAttempt, RegistrationOutcome, attempt_login, attempt_registration, logout,
+};
 pub use password_confirmation::{
     DEFAULT_PASSWORD_TIMEOUT_SECONDS, PASSWORD_CONFIRMATION_REDIRECT, PASSWORD_CONFIRMED_AT, password_is_confirmed,
 };
