@@ -13,10 +13,11 @@ This document establishes direction. It does not select crates, define a feature
 - **Name:** Aurelin.
 - **Backend:** Rust.
 - **Behavioral reference:** Laravel 13.
-- **Frontend:** First-class Inertia-style support.
-- **Frontend choices:** Vue or React, using Vite. Aurelin will not provide
-  Svelte or Livewire starters; those frontend stacks are explicitly out of
-  scope.
+- **Frontend:** First-class Inertia support for JavaScript applications and a
+  separate full-stack Leptos convention for Rust/WASM applications.
+- **Frontend choices:** Vue or React using Inertia and Vite, or Rust/WASM using
+  Leptos SSR and hydration with `cargo-leptos`. Aurelin will not provide Svelte
+  or Livewire starters; those frontend stacks are explicitly out of scope.
 - **Inertia SSR:** Supported in a later milestone, not required for the initial
   starter release.
 - **Templating:** No Blade equivalent.
@@ -58,6 +59,12 @@ Inertia-style application development is a first-class framework path. Rust hand
 Use Inertia's documented protocol and existing frontend adapters as the reference for compatibility. Reuse the existing client ecosystem rather than inventing a similar-looking protocol or a custom frontend framework. Verify version compatibility when choosing the Rust integration.
 
 Both Vue and React starters should exercise the same backend conventions and behavior. An application chooses one frontend; it should not require both.
+
+Rust/WASM applications use full-stack Leptos directly rather than implementing
+an Inertia client. Leptos owns SSR, hydration, client routing, resources,
+actions, and typed server functions; `cargo-leptos` builds the native server
+and browser bundle without Node.js. This is a separate convention and does not
+change the Vue or React starters.
 
 Provide the minimal HTML document needed to mount the frontend and load its assets. This does not imply a Blade replacement or a general-purpose server-side template system.
 

@@ -4,8 +4,9 @@
 
 Aurelin brings proven application conventions to Rust without replacing the
 ecosystem that already works. Axum handles HTTP. SeaORM handles application
-data. Inertia connects the backend to React or Vue. Aurelin makes those parts
-work together as one coherent framework.
+data. Inertia connects the backend to React or Vue, while Leptos provides a
+native full-stack Rust/WASM path. Aurelin makes those parts work together as
+coherent application conventions.
 
 The goal is simple: start with a complete application, not a collection of
 integration decisions.
@@ -21,6 +22,7 @@ integration decisions.
 - Graceful shutdown and health checks
 - Inertia 3 integration for React 19 and Vue 3
 - Vite development and embedded production assets
+- Leptos SSR and WebAssembly hydration without Node.js
 - SQLite persistence with SeaORM
 - Persisted sessions and CSRF protection
 - Registration, login, logout, and remember-me authentication
@@ -55,8 +57,8 @@ Open <http://127.0.0.1:8000> and register an account.
 Run `cargo aurelin` inside the generated project to list its application
 commands.
 
-Use `--frontend vue` for Vue, or omit `--frontend` to generate a backend-only
-application:
+Use `--frontend vue` for Vue, `--frontend wasm` for the Rust-native Leptos
+foundation, or omit `--frontend` to generate a backend-only application:
 
 ```sh
 aurelin new /tmp/my-aurelin-api
@@ -78,10 +80,11 @@ and gives each concern a clear home.
 | Async runtime | Tokio |
 | Data and migrations | SeaORM |
 | Server-driven frontend | Inertia |
+| Full-stack Rust/WASM | Leptos and cargo-leptos |
 | Sessions | tower-sessions |
 | Mail | lettre |
 | Passkeys | webauthn-rs |
-| Frontend | React or Vue with Vite |
+| Frontend | React or Vue with Vite; Rust/WASM with Leptos |
 
 Applications still use these libraries through their native APIs. Aurelin is
 the convention and integration layer, not a second abstraction over

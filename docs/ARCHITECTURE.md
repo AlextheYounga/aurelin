@@ -99,6 +99,39 @@ app starts Vite as a managed child in debug builds and terminates it when the
 backend exits. During `cargo build --release`, `vite-rs` runs Vite and embeds
 the resulting `dist` files into the executable.
 
+### Rust/WASM frontend foundation
+
+`aurelin new --frontend wasm` generates a separate full-stack Leptos 0.8
+application convention. Leptos renders route-specific HTML through Axum,
+hydrates the existing document in the browser, and owns browser navigation and
+typed server-function dispatch. The starter uses Leptos APIs directly; Aurelin
+does not add an Inertia page protocol or rename ordinary Leptos concepts.
+
+`cargo-leptos` 0.3 builds the native server and the
+`wasm32-unknown-unknown` browser library. Server-only Aurelin, Tokio, SeaORM,
+and CLI dependencies are optional and enabled only by the `ssr` feature, so
+the hydration target does not compile the backend stack. The generated project
+contains no package manifest, Vite configuration, npm step, or Node.js
+dependency. Axum infrastructure routes such as `/up` remain separate from the
+Leptos presentation routes.
+
+This follows Laravel Blade's ownership boundary: Laravel Framework owns its
+reusable view integration while applications own templates. Aurelin's
+`aurelin-framework::view::leptos` module therefore owns reusable Leptos request
+protections, currently synchronizer-token issuance and validation for server
+functions. Generated applications continue to own their Leptos shell, routes,
+components, and ordinary router composition.
+
+The WASM starter establishes generation, SSR, hydration, routing, typed server
+functions, static assets, the Node-free production build, persisted sessions,
+and Fortify-backed registration, login, logout, and authenticated dashboard
+boundaries. Those server functions delegate password policy, user creation,
+verification notification, authentication timing, throttling, session
+transitions, remember-me behavior, and two-factor branching to
+`aurelin-fortify`; they do not copy those workflows into the starter. The
+remaining email-verification action, password-reset, two-factor input, passkey,
+and account-settings presentation adapters are incomplete.
+
 ### Authentication foundation
 
 The behavioral baseline was rechecked on 2026-11-19 against Laravel Framework
