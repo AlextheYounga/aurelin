@@ -44,7 +44,7 @@ content, and interface.
 Install Aurelin and generate a React application:
 
 ```sh
-cargo install aurelin-cli
+cargo install aurelin
 aurelin new /tmp/my-aurelin-app --frontend react
 
 cd /tmp/my-aurelin-app
@@ -56,6 +56,9 @@ cargo aurelin dev
 Open <http://127.0.0.1:8000> and register an account.
 Run `cargo aurelin` inside the generated project to list its application
 commands.
+
+The former `aurelin-cli` package remains on crates.io for existing users, but
+new releases use the `aurelin` package name.
 
 Use `--frontend vue` for Vue, `--frontend wasm` for the Rust-native Leptos
 foundation, or omit `--frontend` to generate a backend-only application:
@@ -97,7 +100,7 @@ everything beneath it.
 | `aurelin-framework` | Core configuration, HTTP, sessions, mail, encryption, signed URLs, rate limiting, and authentication primitives |
 | `aurelin-fortify` | Headless authentication workflows and Axum integration |
 | `aurelin-passkeys` | WebAuthn registration and authentication ceremonies |
-| `aurelin-cli` | Application generation and shell completions |
+| `aurelin` | Application generation and shell completions |
 
 ## Project status
 
@@ -124,7 +127,7 @@ cargo test --workspace
 Generate shell completions with:
 
 ```sh
-cargo run -p aurelin-cli -- completions bash
+cargo run -p aurelin -- completions bash
 ```
 
 Replace `bash` with another shell supported by `clap_complete`.

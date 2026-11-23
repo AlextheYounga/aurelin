@@ -399,7 +399,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "aurelin-cli"
+name = "aurelin"
 version = "0.3.3"
 dependencies = [
  "anyhow",

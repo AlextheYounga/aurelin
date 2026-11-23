@@ -41,7 +41,9 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
       `aurelin-passkeys`, `aurelin-fortify`, and `aurelin-cli`.
 - [x] Publish a coordinated release containing guided generation and queue
       support in dependency order.
-- [x] Install the released CLI with `cargo install aurelin-cli` on a clean
+- [x] Rename the CLI package to `aurelin` and publish it under the canonical
+      crates.io name.
+- [x] Install the released CLI with `cargo install aurelin` on a clean
       machine or equivalent isolated environment.
 - [x] Generate registry dependencies by default instead of requiring
       `--framework-path`.

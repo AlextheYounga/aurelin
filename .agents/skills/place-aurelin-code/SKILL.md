@@ -1,6 +1,6 @@
 ---
 name: place-aurelin-code
-description: Determine and enforce the correct Aurelin package, framework crate, CLI, generated-application, and starter-template boundary before code is written. Use whenever implementing, modifying, moving, reviewing, or planning Aurelin behavior; adding routes, handlers, middleware, workflows, policies, defaults, configuration, persistence, frontend code, scaffolding, or templates; translating Laravel or first-party package behavior; or touching anything under crates/aurelin-cli/starters. Requires proving upstream ownership, recognizing that starter files are copied into every generated project, and blocking reusable framework or package logic from being placed in templates.
+description: Determine and enforce the correct Aurelin package, framework crate, CLI, generated-application, and starter-template boundary before code is written. Use whenever implementing, modifying, moving, reviewing, or planning Aurelin behavior; adding routes, handlers, middleware, workflows, policies, defaults, configuration, persistence, frontend code, scaffolding, or templates; translating Laravel or first-party package behavior; or touching anything under crates/aurelin/starters. Requires proving upstream ownership, recognizing that starter files are copied into every generated project, and blocking reusable framework or package logic from being placed in templates.
 ---
 
 # Place Aurelin Code
@@ -136,7 +136,7 @@ Before completion, inspect every changed file and answer:
   package/framework, never the reverse?
 
 List intentional starter logic in the completion report. Treat unexplained
-reusable logic under `crates/aurelin-cli/starters` as a failed review.
+reusable logic under `crates/aurelin/starters` as a failed review.
 
 ## Correct existing violations
 

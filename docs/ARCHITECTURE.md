@@ -13,7 +13,7 @@ aurelin/
 │   ├── aurelin-framework/       # Runtime integration and conventions
 │   ├── aurelin-fortify/         # Headless authentication package
 │   ├── aurelin-passkeys/        # WebAuthn ceremony integration
-│   └── aurelin-cli/             # Project generator and embedded starters
+│   └── aurelin/                 # Project generator and embedded starters
 │       └── starters/base/
 └── laravel -> ...            # Local Laravel source reference, not a dependency
 ```
