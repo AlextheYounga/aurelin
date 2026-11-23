@@ -12,6 +12,7 @@ pub mod queue;
 pub mod session;
 pub mod signed_url;
 pub mod timebox;
+pub mod view;
 
 pub use axum;
 pub use inertia_rs as inertia;

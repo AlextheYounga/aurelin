@@ -7,18 +7,24 @@ description.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+leptos = ["dep:axum-tower-sessions-csrf", "dep:constant_time_eq", "dep:leptos_axum"]
+
 [dependencies]
 aes-gcm = "0.10"
 apalis = "=1.1.1"
 apalis-sqlite = "=1.1.1"
 axum = "0.8"
+axum-tower-sessions-csrf = { version = "=0.1.1", optional = true }
 base64 = "0.22"
 bcrypt = "0.17"
 config = { version = "0.15", default-features = false }
+constant_time_eq = { version = "0.4", optional = true }
 dotenvy = "0.15"
 hmac = "0.12"
 hkdf = "0.12"
 lettre = { version = "0.11.19", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls"] }
+leptos_axum = { version = "0.8.8", optional = true }
 inertia_rs = { version = "0.4", default-features = false, features = ["axum"] }
 rand = "0.9"
 reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
