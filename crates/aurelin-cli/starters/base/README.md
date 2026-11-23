@@ -25,6 +25,12 @@ and run a worker in another terminal:
 cargo aurelin queue:work
 ```
 
+Jobs retry up to the attempt limit selected when they are dispatched. Inspect
+and operate exhausted jobs with `cargo aurelin queue:failed`,
+`cargo aurelin queue:retry <id>`, `cargo aurelin queue:forget <id>`, and
+`cargo aurelin queue:flush`. Queue schema is installed only by `cargo aurelin
+migrate`.
+
 This is the backend foundation, not the finished Vue/React authentication
 starter. Sessions, CSRF, database access, frontend assets, and authentication
 have not been installed. HTTP routes do not yet have Laravel's `web` middleware.

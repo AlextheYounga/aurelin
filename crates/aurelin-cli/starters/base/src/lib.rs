@@ -9,7 +9,7 @@ use tokio::net::TcpListener;
 
 pub mod bootstrap;
 pub mod console;
-mod database;
+pub mod database;
 pub mod jobs;
 #[path = "../database/migrations/mod.rs"]
 mod migrations;

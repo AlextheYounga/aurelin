@@ -30,7 +30,7 @@ integration decisions.
 - Passkey registration and authentication
 - Account and profile settings
 - SMTP mail delivery
-- SQLite-backed background jobs and workers
+- SQLite-backed background jobs, retries, failed-job operations, and workers
 
 Authentication is split deliberately between reusable packages and generated
 application code. Aurelin provides the secure workflows and contracts; your

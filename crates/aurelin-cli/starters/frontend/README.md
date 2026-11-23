@@ -48,3 +48,9 @@ database for its default durable queue. Run a worker in another terminal with:
 ```sh
 cargo aurelin queue:work
 ```
+
+Jobs retry up to the attempt limit selected when they are dispatched. Inspect
+and operate exhausted jobs with `cargo aurelin queue:failed`,
+`cargo aurelin queue:retry <id>`, `cargo aurelin queue:forget <id>`, and
+`cargo aurelin queue:flush`. Queue schema is installed only by `cargo aurelin
+migrate`.
