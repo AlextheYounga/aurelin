@@ -81,6 +81,23 @@ fn generated_projects_use_published_aurelin_versions_by_default() -> TestResult 
 }
 
 #[test]
+fn generated_wasm_projects_include_required_hidden_configuration() -> TestResult {
+    let directory = TempDir::new()?;
+    let destination = directory.path().join("app");
+    let result = Command::new(env!("CARGO_BIN_EXE_aurelin"))
+        .args(["new", "--no-interaction"])
+        .arg(&destination)
+        .args(["--frontend", "wasm"])
+        .output()?;
+
+    assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    for path in [".cargo/config.toml", ".env", ".env.example", ".gitignore"] {
+        assert!(destination.join(path).is_file(), "generated project is missing {path}");
+    }
+    Ok(())
+}
+
+#[test]
 fn non_interactive_generation_requires_a_destination() -> TestResult {
     let result = Command::new(env!("CARGO_BIN_EXE_aurelin")).args(["new", "--no-interaction"]).output()?;
     assert!(!result.status.success());

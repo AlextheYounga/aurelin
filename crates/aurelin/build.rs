@@ -4,6 +4,13 @@ use std::{
 };
 
 const EXCLUDED_DIRECTORIES: &[&str] = &[".git", "node_modules", "target"];
+const REQUIRED_TEMPLATE_FILES: &[&str] = &[
+    "authentication/.env.example",
+    "base/.cargo/config.toml",
+    "base/.env.example",
+    "base/.gitignore",
+    "frontend/.gitignore",
+];
 
 fn main() -> io::Result<()> {
     let manifest = PathBuf::from(
@@ -22,6 +29,15 @@ fn main() -> io::Result<()> {
         let source = manifest.join("starters").join(starter);
         println!("cargo:rerun-if-changed={}", source.display());
         copy_template(&source, &output.join(starter))?;
+    }
+    for required in REQUIRED_TEMPLATE_FILES {
+        let path = output.join(required);
+        if !path.is_file() {
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("required starter template was not packaged: {}", path.display()),
+            ));
+        }
     }
     Ok(())
 }
