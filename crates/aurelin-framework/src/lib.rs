@@ -8,6 +8,7 @@ pub mod authorization;
 pub mod cache;
 pub mod configuration;
 pub mod database;
+pub mod events;
 pub mod http;
 pub mod mail;
 pub mod queue;

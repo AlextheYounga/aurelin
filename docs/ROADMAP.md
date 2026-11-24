@@ -282,8 +282,8 @@ does not by itself complete a capability.
 
 ### Events
 
-- [ ] Implement event dispatch and listener registration.
-- [ ] Define synchronous listener ordering and failure behavior.
+- [x] Implement event dispatch and listener registration.
+- [x] Define synchronous listener ordering and failure behavior.
 - [ ] Integrate queued listeners after the queue boundary exists.
 
 ### Cache

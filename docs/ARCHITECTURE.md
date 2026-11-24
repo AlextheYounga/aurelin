@@ -298,6 +298,52 @@ This is a deliberate Laravel 13 subset. Tags, stale-while-revalidate,
 memoization, cache events, failover, custom driver registration, a multiple
 named-store manager, and PHP serialization compatibility remain deferred.
 
+### Events
+
+Laravel's reusable event dispatcher is owned by the `illuminate/events`
+package. Aurelin keeps the corresponding typed registry and dispatch mechanics
+in `aurelin-framework::events`; generated applications own their event types,
+listener implementations and dependencies, and explicit bootstrap
+registration. This boundary was verified against Laravel Framework 13.x commit
+`ddbf5ebcdef2be42d326c8c909c9e40228d9e517`, principally
+`src/Illuminate/Events/Dispatcher.php`,
+`src/Illuminate/Contracts/Events/Dispatcher.php`, and
+`tests/Events/EventsDispatcherTest.php`.
+
+Applications register typed async listeners through `EventDispatcher::builder`
+and then build an immutable dispatcher. Dispatcher clones share that registry
+through `Arc`, so they are cheap to place in Axum state and safe to use from
+concurrent request handlers. Duplicate registrations remain distinct. Within
+one dispatch, listeners are awaited sequentially in registration order; a
+listener failure becomes a structured `DispatchError` and prevents every later
+listener from running. Dispatching an event without listeners succeeds with
+`DispatchOutcome::Completed`. `ListenerControl::Stop` deliberately translates
+Laravel's exact-`false` propagation stop without importing PHP's mixed return
+values.
+
+Every listener in one dispatch receives an `Arc` to the same typed event.
+Unlike Laravel's mutable PHP object payload, the event is immutable by default;
+shared mutation must be explicit through a synchronization-safe Rust type.
+Separate concurrent dispatches own separate event values. Async listeners are
+a Rust integration adaptation: awaiting them one at a time preserves Laravel's
+synchronous ordering and failure boundary while allowing listeners to use the
+application's async database, mail, and HTTP dependencies.
+
+The `event-listener` crate was not added. It wakes waiting tasks or threads but
+does not register or invoke typed callbacks, await them sequentially, or return
+listener failures. Tokio broadcast similarly does not provide the required
+ordering and failure semantics. Laravel's response arrays and `until` method
+are not included in this initial side-effect dispatcher because a typed Rust
+equivalent needs an actual response-producing consumer to establish its event
+response type. Wildcards, subscribers, discovery, deferred and after-commit
+events, broadcasting, and queued listeners also remain deferred. A future
+queued-listener adapter can register through the existing async listener seam
+and use Apalis without coupling this dispatcher to the queue today.
+
+Authentication, authorization gate, and health diagnostic events remain
+follow-up consumers of this foundation; this branch does not add those
+integrations.
+
 ### Application console
 
 Generated projects expose their application commands through the visible Cargo
