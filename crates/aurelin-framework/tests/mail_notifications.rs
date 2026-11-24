@@ -4,7 +4,7 @@ use std::{
     io::{self, BufRead, BufReader, Write},
     net::TcpListener,
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
     thread,
@@ -17,6 +17,7 @@ use aurelin_framework::{
         AnonymousRecipient, Channel, DispatchError, Notification, NotificationDispatcher, NotificationError,
     },
 };
+use tracing::subscriber::set_default;
 
 struct Invoice {
     selected: bool,
@@ -142,6 +143,64 @@ async fn smtp_preserves_explicit_sender_and_copy_envelope_without_bcc_header() -
 async fn invalid_addresses_and_missing_recipients_fail_even_for_log_mail() -> Result<(), Box<dyn Error>> {
     assert!(MailMessage::new("subject", "body").to("not an address").is_err());
     assert!(Mailer::log().send(MailMessage::new("subject", "body")).await.is_err());
+    Ok(())
+}
+
+#[tokio::test]
+async fn invalid_notification_route_fails_without_connecting_to_smtp() -> Result<(), Box<dyn Error>> {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    listener.set_nonblocking(true)?;
+    let environment = HashMap::from([
+        ("MAIL_MAILER".into(), "smtp".into()),
+        ("MAIL_HOST".into(), "127.0.0.1".into()),
+        ("MAIL_PORT".into(), listener.local_addr()?.port().to_string()),
+        ("MAIL_ENCRYPTION".into(), "none".into()),
+        ("MAIL_FROM_ADDRESS".into(), "default@example.com".into()),
+    ]);
+    let dispatcher = NotificationDispatcher::new(Mailer::from_environment(&environment)?);
+    let notification = Invoice { selected: true, calls: Arc::new(AtomicUsize::new(0)) };
+    let error = dispatcher.send(&AnonymousRecipient::mail("invalid address"), &notification).await;
+    assert!(matches!(error, Err(DispatchError::Mail(MailError::Address(_)))));
+    assert!(matches!(listener.accept(), Err(error) if error.kind() == io::ErrorKind::WouldBlock));
+    Ok(())
+}
+
+struct LogWriter(Arc<Mutex<Vec<u8>>>);
+
+impl Write for LogWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.0.lock().map_err(|_| io::Error::other("log lock poisoned"))?.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[tokio::test]
+async fn log_mail_builds_and_logs_the_composed_message_without_smtp() -> Result<(), Box<dyn Error>> {
+    let output = Arc::new(Mutex::new(Vec::new()));
+    let writer = output.clone();
+    let subscriber = tracing_subscriber::fmt()
+        .without_time()
+        .with_ansi(false)
+        .with_writer(move || LogWriter(writer.clone()))
+        .finish();
+    let _guard = set_default(subscriber);
+    Mailer::log().send(MailMessage::new("Log subject", "Log body").to("ada@example.com")?).await?;
+    let dispatcher = NotificationDispatcher::new(Mailer::log());
+    let notification = Invoice { selected: true, calls: Arc::new(AtomicUsize::new(0)) };
+    dispatcher.send(&AnonymousRecipient::mail("first@example.com"), &notification).await?;
+    dispatcher.clone().send(&AnonymousRecipient::mail("second@example.com"), &notification).await?;
+    let bytes = output.lock().map_err(|_| io::Error::other("log lock poisoned"))?.clone();
+    let log = String::from_utf8(bytes)?;
+    assert!(log.contains("ada@example.com"));
+    assert!(log.contains("Log subject"));
+    assert!(log.contains("Log body"));
+    assert_eq!(log.matches("first@example.com").count(), 1);
+    assert_eq!(log.matches("second@example.com").count(), 1);
+    assert!(!log.contains("wrong@example.com"));
     Ok(())
 }
 

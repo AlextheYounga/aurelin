@@ -52,3 +52,4 @@ workspace = true
 tower = { version = "0.5", features = ["util"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "test-util"] }
 tempfile = "3"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
