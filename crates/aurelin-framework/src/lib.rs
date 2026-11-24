@@ -12,6 +12,7 @@ pub mod events;
 pub mod http;
 pub mod mail;
 pub mod queue;
+pub mod scheduling;
 pub mod session;
 pub mod signed_url;
 pub mod timebox;
