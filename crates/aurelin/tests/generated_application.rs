@@ -88,6 +88,31 @@ fn generated_project_builds_tests_and_serves_real_http() -> Result<(), Box<dyn E
     assert!(commands.contains("queue:retry"));
     assert!(commands.contains("queue:forget"));
     assert!(commands.contains("queue:flush"));
+    assert!(commands.contains("schedule:run"));
+
+    // Install an application-owned callback in the generated project, then run
+    // its compiled console command through the real scheduler boundary.
+    fs::write(
+        destination.join("src/schedule.rs"),
+        r#"
+use aurelin_framework::scheduling::{ConfigurationError, Schedule, TaskBuilder};
+
+pub fn schedule() -> Result<Schedule, ConfigurationError> {
+    let mut builder = Schedule::builder();
+    builder.task(TaskBuilder::new("integration", "* * * * *", || async {
+        std::fs::write("scheduler-ran", "yes")
+    }));
+    builder.build()
+}
+"#,
+    )?;
+    let scheduled = Command::new("cargo")
+        .args(["aurelin", "schedule:run"])
+        .env("CARGO_TARGET_DIR", &target)
+        .current_dir(&destination)
+        .output()?;
+    assert!(scheduled.status.success(), "{}", String::from_utf8_lossy(&scheduled.stderr));
+    assert_eq!(fs::read_to_string(destination.join("scheduler-ran"))?, "yes");
 
     let unmigrated_queue = Command::new("cargo")
         .args(["aurelin", "queue:failed"])

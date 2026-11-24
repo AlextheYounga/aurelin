@@ -43,6 +43,9 @@ enum Command {
     /// Process queued jobs
     #[command(name = "queue:work")]
     QueueWork,
+    /// Run scheduled tasks that are due now
+    #[command(name = "schedule:run")]
+    ScheduleRun,
     /// List failed queue jobs
     #[command(name = "queue:failed")]
     QueueFailed {
@@ -102,6 +105,10 @@ pub async fn run(environment: HashMap<String, String>) -> Result<(), Box<dyn Err
             crate::database::fresh(database_url(&environment)).await
         }
         Some(Command::QueueWork) => crate::jobs::work(database_url(&environment)).await,
+        Some(Command::ScheduleRun) => {
+            aurelin_framework::scheduling::commands::run(&crate::schedule::schedule()?).await?;
+            Ok(())
+        }
         Some(Command::QueueFailed { queue }) => {
             aurelin_framework::queue::commands::failed(database_url(&environment), queue.as_deref())
                 .await
