@@ -5,6 +5,7 @@
 
 pub mod auth;
 pub mod authorization;
+pub mod cache;
 pub mod configuration;
 pub mod database;
 pub mod http;
