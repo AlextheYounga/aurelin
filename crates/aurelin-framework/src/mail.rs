@@ -1,13 +1,16 @@
 use std::{collections::HashMap, num::ParseIntError};
 
 use lettre::{
-    AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+    AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
     address::AddressError,
     error::Error as LettreError,
     message::Mailbox,
     transport::smtp::{Error as SmtpError, authentication::Credentials},
 };
 use thiserror::Error;
+
+mod message;
+pub use message::MailMessage;
 
 #[derive(Clone, Debug)]
 pub struct Mailer {
@@ -22,23 +25,32 @@ impl Mailer {
 
     pub fn from_environment(environment: &HashMap<String, String>) -> Result<Self, MailError> {
         match environment.get("MAIL_MAILER").map_or("log", String::as_str) {
-            "log" => Ok(Self::log()),
+            "log" => {
+                let from = environment
+                    .get("MAIL_FROM_ADDRESS")
+                    .filter(|value| !value.is_empty())
+                    .map(|address| {
+                        address.parse().map(|address| Mailbox::new(environment.get("MAIL_FROM_NAME").cloned(), address))
+                    })
+                    .transpose()?;
+                Ok(Self { transport: None, from })
+            }
             "smtp" => Self::smtp(environment),
             mailer => Err(MailError::UnsupportedMailer(mailer.to_owned())),
         }
     }
 
-    pub async fn send(&self, recipient: &str, subject: &str, body: String) -> Result<(), MailError> {
-        let Some(transport) = &self.transport else {
-            tracing::info!(%recipient, %subject, %body, "mail notification");
-            return Ok(());
+    pub async fn send(&self, message: MailMessage) -> Result<(), MailError> {
+        let from = match (&self.from, &self.transport) {
+            (None, None) => Some(Mailbox::new(None, "hello@example.com".parse()?)),
+            _ => self.from.clone(),
         };
-        let message = Message::builder()
-            .from(self.from.clone().ok_or(MailError::Missing("MAIL_FROM_ADDRESS"))?)
-            .to(recipient.parse()?)
-            .subject(subject)
-            .body(body)?;
-        transport.send(message).await?;
+        let message = message.build(from)?;
+        if let Some(transport) = &self.transport {
+            transport.send(message).await?;
+        } else {
+            tracing::info!(message = %String::from_utf8_lossy(&message.formatted()), "mail notification");
+        }
         Ok(())
     }
 

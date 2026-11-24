@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use aurelin_framework::mail::Mailer;
+use aurelin_framework::mail::{MailMessage, Mailer};
 
 #[tokio::test]
 async fn smtp_mailer_delivers_a_message_to_the_configured_server() -> Result<(), Box<dyn Error>> {
@@ -31,9 +31,11 @@ async fn smtp_mailer_delivers_a_message_to_the_configured_server() -> Result<(),
     let mailer = Mailer::from_environment(&environment)?;
     mailer
         .send(
-            "ada@example.com",
-            "Verify your email address",
-            "Visit https://example.com/email/verify/signed".into(),
+            MailMessage::new(
+                "Verify your email address",
+                "Visit https://example.com/email/verify/signed",
+            )
+            .to("ada@example.com")?,
         )
         .await?;
 

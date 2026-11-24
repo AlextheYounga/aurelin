@@ -11,6 +11,7 @@ pub mod database;
 pub mod events;
 pub mod http;
 pub mod mail;
+pub mod notifications;
 pub mod queue;
 pub mod session;
 pub mod signed_url;
