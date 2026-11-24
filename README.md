@@ -34,6 +34,7 @@ integration decisions.
 - Application-defined authorization gates and policies
 - SMTP mail delivery
 - SQLite-backed background jobs, retries, failed-job operations, and workers
+- Typed process-local and Redis caching with atomic owner-safe locks
 
 Authentication is split deliberately between reusable packages and generated
 application code. Aurelin provides the secure workflows and contracts; your
@@ -86,6 +87,7 @@ and gives each concern a clear home.
 | Server-driven frontend | Inertia |
 | Full-stack Rust/WASM | Leptos and cargo-leptos |
 | Sessions | tower-sessions |
+| Cache | Moka and Fred/Redis through Aurelin's typed cache API |
 | Authorization | Aurelin gates and application-owned policies over axum-login |
 | Mail | lettre |
 | Passkeys | webauthn-rs |
@@ -99,7 +101,7 @@ everything beneath it.
 
 | Package | Responsibility |
 |---|---|
-| `aurelin-framework` | Core configuration, HTTP, sessions, authorization, mail, encryption, signed URLs, rate limiting, and authentication primitives |
+| `aurelin-framework` | Core configuration, HTTP, sessions, cache and locks, authorization, mail, encryption, signed URLs, rate limiting, and authentication primitives |
 | `aurelin-fortify` | Headless authentication workflows and Axum integration |
 | `aurelin-passkeys` | WebAuthn registration and authentication ceremonies |
 | `aurelin` | Application generation and shell completions |

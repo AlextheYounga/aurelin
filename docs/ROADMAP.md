@@ -288,15 +288,25 @@ does not by itself complete a capability.
 
 ### Cache
 
-- [ ] Implement process-local and distributed cache drivers.
-- [ ] Match Laravel's observable cache expiration and mutation behavior.
-- [ ] Implement atomic cache locks and required Laravel cache semantics.
+- [x] Implement process-local Moka and distributed Fred/Redis cache drivers,
+      verified through a shared contract against Moka and a controlled real
+      Redis server.
+- [x] Match the implemented Laravel cache subset's observable expiration,
+      conditional write, retrieval, removal, integer mutation, remember,
+      multiple-key, prefix, and flush behavior.
+- [x] Implement atomic owner-token cache locks with acquisition, restoration,
+      owner-aware and forced release, refresh, expiration, and blocking
+      timeouts.
+- [ ] Add tags, stale-while-revalidate, memoization, events, failover, custom
+      drivers, and a multiple named-store manager.
 
 ### Scheduling
 
 - Queue and worker support is part of the initial usable release milestone
   above.
 - [ ] Implement scheduled tasks and overlap prevention.
+- Atomic cache locks are available for later overlap prevention; this milestone
+  does not implement scheduler behavior.
 
 ### Notifications and mail
 

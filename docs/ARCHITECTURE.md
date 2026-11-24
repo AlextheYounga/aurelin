@@ -260,6 +260,44 @@ until Aurelin's general event dispatcher exists, policy generation belongs to
 the later CLI-tooling milestone, and authorization props for Inertia remain an
 application presentation decision as Laravel documents.
 
+### Cache foundation
+
+Laravel Framework's `illuminate/cache` package owns the cache repository,
+stores, and lock contracts. Aurelin keeps the corresponding reusable behavior
+in `aurelin-framework::cache`. Generated applications select a driver and own
+its environment and service configuration, including the Moka capacity, Redis
+URL, Redis database, and key prefix. Starter templates do not contain cache
+algorithms or lock scripts.
+
+The cloneable `Cache` API provides typed `get`, `put`, `put_many`, `get_many`,
+`forever`, `forget`, `flush`, `has`, `missing`, `add`, `pull`, integer mutation,
+`touch`, `remember`, and `remember_forever` operations. Positive lifetimes are
+whole seconds; zero and negative write lifetimes remove an existing value,
+while conditional `add` performs no write. Missing integer mutations create an
+indefinite signed integer. Moka 0.12.16 supplies process-local storage and Fred
+10.1.0 supplies Redis or Valkey storage. Driver and connectivity failures are
+returned rather than converted into misses.
+
+Both drivers store non-null JSON. Decoding is requested as a concrete Rust
+type, so malformed data and type mismatches are explicit errors. JSON was
+chosen as a safe data representation, not for PHP serialization
+interoperability. Keys receive the application's explicit prefix. Like
+Laravel's Redis warning, `flush` ignores that prefix and clears the selected
+backend (the whole Moka store or Redis database).
+
+Atomic locks use independent opaque 256-bit random owner tokens. Acquisition,
+owner-aware release, force release, restoration, refresh, expiration, and
+blocking timeouts are supported. Moka serializes local operations through its
+atomic entry API. Redis uses `SET NX` with expiration and owner-comparing Lua
+scripts for release and refresh; a handle cannot release another owner's lock.
+Blocking deadlines use Tokio's monotonic clock. Scheduling may later consume
+this lock API for overlap prevention, but scheduling behavior is outside the
+cache module and remains unimplemented.
+
+This is a deliberate Laravel 13 subset. Tags, stale-while-revalidate,
+memoization, cache events, failover, custom driver registration, a multiple
+named-store manager, and PHP serialization compatibility remain deferred.
+
 ### Application console
 
 Generated projects expose their application commands through the visible Cargo
