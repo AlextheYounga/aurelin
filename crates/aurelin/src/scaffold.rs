@@ -204,7 +204,7 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
         let contents = fs::read_to_string(&source)?;
         fs::write(source, contents.replace("__AURELIN_CRATE__", &crate_name))?;
     }
-    let mut environment = fs::read_to_string(path.join(".env.example"))?;
+    let mut environment = fs::read_to_string(path.join(".env.example")).context("read generated .env.example")?;
     if frontend.is_some_and(Frontend::uses_authentication) {
         let application_key: String = rand::rng().sample_iter(Alphanumeric).take(64).map(char::from).collect();
         environment = environment.replace("change-this-to-a-long-random-secret", &application_key);
