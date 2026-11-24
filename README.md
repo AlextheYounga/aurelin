@@ -31,6 +31,7 @@ integration decisions.
 - Two-factor authentication and recovery codes
 - Passkey registration and authentication
 - Account and profile settings
+- Application-defined authorization gates and policies
 - SMTP mail delivery
 - SQLite-backed background jobs, retries, failed-job operations, and workers
 
@@ -85,6 +86,7 @@ and gives each concern a clear home.
 | Server-driven frontend | Inertia |
 | Full-stack Rust/WASM | Leptos and cargo-leptos |
 | Sessions | tower-sessions |
+| Authorization | Aurelin gates and application-owned policies over axum-login |
 | Mail | lettre |
 | Passkeys | webauthn-rs |
 | Frontend | React or Vue with Vite; Rust/WASM with Leptos |
@@ -97,7 +99,7 @@ everything beneath it.
 
 | Package | Responsibility |
 |---|---|
-| `aurelin-framework` | Core configuration, HTTP, sessions, mail, encryption, signed URLs, rate limiting, and authentication primitives |
+| `aurelin-framework` | Core configuration, HTTP, sessions, authorization, mail, encryption, signed URLs, rate limiting, and authentication primitives |
 | `aurelin-fortify` | Headless authentication workflows and Axum integration |
 | `aurelin-passkeys` | WebAuthn registration and authentication ceremonies |
 | `aurelin` | Application generation and shell completions |

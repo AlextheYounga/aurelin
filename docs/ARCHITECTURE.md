@@ -231,6 +231,35 @@ Generated applications keep reusable behavior in a library target and a thin
 binary entry point. All Rust tests live in each crate's root `tests/` directory;
 production `src/` trees contain no inline test modules or test-only seams.
 
+### Authorization
+
+Laravel Framework owns gates, authorization responses, policies, and its `can`
+middleware. Aurelin therefore keeps the reusable mechanics in
+`aurelin-framework::authorization`. A cloneable `Gate` registry evaluates
+application-defined abilities for the current `axum-login` user, denies guests
+unless an ability explicitly accepts them, and preserves policy messages,
+reason codes, default 403 responses, and deliberate 404 concealment. Global
+before hooks may resolve a check before its ability; after hooks observe every
+resolved result and may only supply a result when no earlier check did.
+
+Applications own their policy structs, dependencies, resource types, ability
+names, and registration. The framework's `Policy` seam only installs those
+application rules into the shared gate registry. Registration is explicit
+rather than discovered from PHP-style namespaces or reflection. Ability
+contexts are typed, can be tuples or application context structs when more than
+one value is needed, and mismatched context types are treated as application
+configuration errors rather than ordinary denials.
+
+`AuthorizeLayer` performs resource-free or fixed-context checks before an Axum
+route handler and reads the user installed by `AuthManagerLayer`. Resource
+handlers load their models through Axum and SeaORM before calling
+`gate.for_user(...).authorize(...)`; Aurelin does not introduce an implicit
+Eloquent-style model-binding layer. Inline `allow_if` and `deny_if` checks bypass
+registered hooks as they do in Laravel. Gate evaluation events remain deferred
+until Aurelin's general event dispatcher exists, policy generation belongs to
+the later CLI-tooling milestone, and authorization props for Inertia remain an
+application presentation decision as Laravel documents.
+
 ### Application console
 
 Generated projects expose their application commands through the visible Cargo

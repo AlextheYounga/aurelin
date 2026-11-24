@@ -443,6 +443,7 @@ dependencies = [
  "apalis",
  "apalis-sqlite",
  "axum",
+ "axum-login",
  "axum-tower-sessions-csrf",
  "base64 0.22.1",
  "bcrypt",

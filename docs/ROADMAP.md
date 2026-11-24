@@ -1,6 +1,6 @@
 # Aurelin Roadmap
 
-Last updated: 2026-11-23
+Last updated: 2026-11-24
 
 This checklist tracks Aurelin's progress toward a cohesive Laravel 13-inspired
 Rust framework. Checked items are implemented and verified at the relevant
@@ -271,7 +271,7 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 
 ### Authorization, configuration, and tooling
 
-- [ ] Implement authorization policies and route/action authorization.
+- [x] Implement authorization policies and route/action authorization.
 - [ ] Expand typed application and service configuration.
 - [ ] Add application-development and inspection commands to the CLI.
 

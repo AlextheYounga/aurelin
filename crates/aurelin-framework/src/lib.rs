@@ -4,6 +4,7 @@
 //! starter wiring rather than a second router or handler API.
 
 pub mod auth;
+pub mod authorization;
 pub mod configuration;
 pub mod database;
 pub mod http;

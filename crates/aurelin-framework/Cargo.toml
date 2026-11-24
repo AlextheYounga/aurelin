@@ -15,6 +15,7 @@ aes-gcm = "0.10"
 apalis = "=1.1.1"
 apalis-sqlite = "=1.1.1"
 axum = "0.8"
+axum-login = "0.18"
 axum-tower-sessions-csrf = { version = "=0.1.1", optional = true }
 base64 = "0.22"
 bcrypt = "0.17"
@@ -37,6 +38,7 @@ sha2 = "0.10"
 sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite"] }
 thiserror = "2"
 tokio = { version = "1", features = ["rt", "sync", "time"] }
+tower = "0.5"
 tower-sessions = "0.14"
 tracing = "0.1"
 
