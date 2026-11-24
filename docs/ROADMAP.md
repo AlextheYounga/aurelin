@@ -304,9 +304,10 @@ does not by itself complete a capability.
 
 - Queue and worker support is part of the initial usable release milestone
   above.
-- [ ] Implement scheduled tasks and overlap prevention.
-- Atomic cache locks are available for later overlap prevention; this milestone
-  does not implement scheduler behavior.
+- [x] Implement explicitly registered async scheduled callbacks, single-run
+      cron due evaluation, and cache-lock overlap prevention.
+- [ ] Add the deferred scheduling features listed in `docs/ARCHITECTURE.md`,
+      including one-server occurrence election and scheduler worker mode.
 
 ### Notifications and mail
 

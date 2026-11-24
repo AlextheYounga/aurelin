@@ -290,9 +290,8 @@ owner-aware release, force release, restoration, refresh, expiration, and
 blocking timeouts are supported. Moka serializes local operations through its
 atomic entry API. Redis uses `SET NX` with expiration and owner-comparing Lua
 scripts for release and refresh; a handle cannot release another owner's lock.
-Blocking deadlines use Tokio's monotonic clock. Scheduling may later consume
-this lock API for overlap prevention, but scheduling behavior is outside the
-cache module and remains unimplemented.
+Blocking deadlines use Tokio's monotonic clock. Scheduling consumes this API
+for overlap prevention; scheduling behavior remains outside the cache module.
 
 This is a deliberate Laravel 13 subset. Tags, stale-while-revalidate,
 memoization, cache events, failover, custom driver registration, a multiple
@@ -354,6 +353,51 @@ migration execution lives in `aurelin-framework` and uses the mapped
 application's commands; `dev`, `serve`, migration commands, and `queue:work`
 remain explicit operations. This follows Laravel 13's Artisan command and
 migration workflows while using static Rust command registration.
+
+### Scheduling
+
+Laravel Framework's `illuminate/console` owns scheduling. The reference is
+Laravel 13.x commit `817f2fc80be4c95f59f7c7f0e696ae1383899fdb`, including
+`src/Illuminate/Console/Scheduling/Schedule.php`, `Event.php`,
+`CallbackEvent.php`, `ScheduleRunCommand.php`, and `CacheEventMutex.php`.
+Reusable scheduling lives in `aurelin-framework::scheduling`. Applications
+own their callbacks, dependencies, names, expressions, and registration in
+`src/schedule.rs`; `cargo aurelin schedule:run` only starts a single framework
+run. Schedule builders validate configuration and produce immutable,
+cheaply-cloned schedules; no registry or scheduler thread is global.
+
+The runner takes one explicit UTC instant (or reads the clock once through
+`run`) and evaluates its minute in each task's validated IANA timezone, UTC by
+default. Five-field cron expressions are parsed using the `cron` crate. Numeric
+weekdays, weekday step expressions, and expressions restricting both day of
+month and weekday are rejected because that parser's semantics differ from
+Laravel's. Other unsupported parser syntax is rejected rather than emulated.
+DST transitions may skip or repeat local times. Every invocation is independent:
+invoking twice in a minute may execute twice. There is no missed-run replay.
+
+Due callbacks execute sequentially in registration order. Errors are recorded
+with task identity and do not prevent later tasks from running. The structured
+report distinguishes success, overlap skips, and callback or lock errors; the
+console reports failures and exits unsuccessfully after processing all due tasks.
+
+Overlap prevention requires a unique nonempty task name, an explicitly supplied
+`Cache`, and a positive whole-second lifetime. The default is 24 hours. Lock
+names are `aurelin:schedule:` followed by the SHA-256 digest of the task name,
+in addition to the cache prefix. The runner acquires a fresh owner-token lock
+without waiting and releases it after success or an ordinary callback error.
+Release is owner-aware, unlike Laravel's force-release cleanup; expiration does
+not let an old owner release a newer lock. If the lock expires during a long
+task, a later execution can overlap; termination, cancellation, panic, or cache
+failure may leave the lock until expiry. A process-local cache only coordinates
+clones sharing that cache in one process; separate scheduler processes or
+servers need the same Redis cache and prefix.
+
+This is not full Laravel scheduler parity. `onOneServer` (per-occurrence
+election), command and queued-job scheduling adapters, `schedule:work`,
+sub-minute tasks, background execution, maintenance and environment checks,
+filters, hooks, scheduler events, output capture, pause and interrupt,
+groups, frequency shortcuts, and scheduler inspection commands are deferred.
+Callbacks can explicitly use other public framework APIs themselves.
 
 ### Queue foundation
 
