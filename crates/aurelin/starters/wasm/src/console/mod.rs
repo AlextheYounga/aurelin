@@ -41,6 +41,9 @@ enum Command {
     /// Process queued jobs
     #[command(name = "queue:work")]
     QueueWork,
+    /// Run scheduled tasks that are due now
+    #[command(name = "schedule:run")]
+    ScheduleRun,
 }
 
 pub async fn run(environment: HashMap<String, String>) -> Result<(), Box<dyn Error>> {
@@ -67,6 +70,10 @@ pub async fn run(environment: HashMap<String, String>) -> Result<(), Box<dyn Err
             crate::database::fresh(database_url(&environment)).await
         }
         Some(Command::QueueWork) => crate::jobs::work(database_url(&environment)).await,
+        Some(Command::ScheduleRun) => {
+            aurelin_framework::scheduling::commands::run(&crate::schedule::schedule()?).await?;
+            Ok(())
+        }
     }
 }
 

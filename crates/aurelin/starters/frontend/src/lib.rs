@@ -19,6 +19,7 @@ pub mod jobs;
 #[path = "../database/migrations/mod.rs"]
 mod migrations;
 pub mod routes;
+pub mod schedule;
 
 pub async fn run() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt()

@@ -59,6 +59,11 @@ Open <http://127.0.0.1:8000> and register an account.
 Run `cargo aurelin` inside the generated project to list its application
 commands.
 
+Register scheduled callbacks in `src/schedule.rs`, then invoke
+`cargo aurelin schedule:run` once per minute from your system scheduler. Use a
+shared Redis cache for overlap prevention across separate processes. See
+`docs/ARCHITECTURE.md` for the supported cron subset and scheduler limitations.
+
 The former `aurelin-cli` package remains on crates.io for existing users, but
 new releases use the `aurelin` package name.
 

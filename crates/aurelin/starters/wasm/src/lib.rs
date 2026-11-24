@@ -33,6 +33,8 @@ pub mod jobs;
 mod migrations;
 #[cfg(feature = "ssr")]
 pub mod routes;
+#[cfg(feature = "ssr")]
+pub mod schedule;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
