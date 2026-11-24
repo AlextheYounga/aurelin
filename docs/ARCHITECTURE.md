@@ -344,6 +344,83 @@ Authentication, authorization gate, and health diagnostic events remain
 follow-up consumers of this foundation; this branch does not add those
 integrations.
 
+### Notifications and mail
+
+Laravel Framework's `illuminate/notifications` owns notification routing and
+dispatch; `illuminate/mail` owns general mail composition and transport.
+Aurelin keeps both reusable integrations in `aurelin-framework`, respectively
+`notifications` and `mail`. The Laravel reference is Framework 13.x commit
+`ddbf5ebcdef2be42d326c8c909c9e40228d9e517`, including
+`Notifications/NotificationSender.php`, `Notifications/Channels/MailChannel.php`,
+`Notifications/Messages/{SimpleMessage,MailMessage}.php`, and
+`Mail/{Mailer,Mailable,SendQueuedMailable}.php` under `src/Illuminate/`.
+
+Applications implement `Notification<R>` for their own types: `via` chooses
+zero or more channels for each recipient and `to_mail` supplies application
+content. `MailRecipient<N>` explicitly routes mail, including notification-aware
+routing without requiring an ORM. `AnonymousRecipient::mail` provides an
+on-demand route. `NotificationDispatcher` takes an explicit cloneable `Mailer`;
+there is no global registry. Mail is the only supported channel. An empty channel
+list performs no routing, composition, or delivery. A missing mail route is
+skipped after composition, as in Laravel's mail channel. Channel selection,
+routing, composition, message construction, and delivery errors are returned.
+Routing replaces any `to` recipients in the composed notification message so a
+reused message cannot leak another recipient's route.
+
+`MailMessage` represents general mail independently of notifications. It accepts
+validated named mailboxes, a subject, rendered plain text, optional rendered
+HTML, explicit sender, reply-to, CC, and BCC. Lettre constructs the message and
+multipart alternatives, strips the BCC header while retaining its SMTP envelope,
+and sends through the configured SMTP transport. Explicit sender overrides the
+configured sender. SMTP configuration continues to require `MAIL_FROM_ADDRESS`;
+the log mailer uses the configured sender or local `hello@example.com` default.
+Both transports build and validate the same message first. Log delivery logs the
+rendered message, including its body, as the pre-existing development behavior;
+logs must therefore be protected as sensitive data. SMTP credentials are not
+part of the message. Applications own content and any renderer functions; there
+is no template engine or automatic HTML escaping.
+
+The message is a concrete serializable Apalis job. Applications may push it to
+`queue::sqlite::<MailMessage>` using the existing `TaskSink` and run an Apalis
+worker whose handler calls `mailer.send(message)`. The worker must be explicitly
+registered: the generated `queue:work` currently handles only the application's
+example job. The queued message stores rendered bodies and addresses in SQLite,
+including failed-job payloads; protect queue storage accordingly. Addresses
+are revalidated on deserialization and credentials are never serialized.
+Retries may deliver duplicates if an SMTP server accepted a message before a
+worker failed; the tested single execution is not an exactly-once guarantee.
+
+For example, application bootstrap can use Apalis's existing sink and worker
+directly after applying the application's queue migration:
+
+```rust,ignore
+let mut queue = queue::sqlite::<MailMessage>(&database_url).await?;
+queue.push(MailMessage::new("Invoice paid", "Thank you").to("ada@example.com")?).await?;
+
+let worker = WorkerBuilder::new("mail").backend(queue).build(move |message: MailMessage| {
+    let mailer = mailer.clone();
+    async move {
+        mailer.send(message).await?;
+        Ok::<(), BoxDynError>(())
+    }
+});
+worker.run().await?;
+```
+
+The example uses `queue::{self, BoxDynError, TaskSink, WorkerBuilder}` and
+`mail::MailMessage` from `aurelin_framework`; run the worker as a long-lived
+application process, not as part of an HTTP request.
+
+Unlike Laravel's queued notifications, queued messages are rendered before
+enqueueing, and recipient models and arbitrary application notification objects
+are not serialized or restored. Per-channel queue connections, queues and
+delays, notification events, notification identifiers, locale selection,
+Laravel's greeting/line/action renderer, Markdown/Blade mail, attachments,
+headers, and all other notification channels remain deferred. Notification
+events need a compatible event cancellation/response seam before being added;
+the existing event dispatcher is not replaced. Laravel `Mailable` workflows
+are not claimed: applications can compose rendered general mail directly.
+
 ### Application console
 
 Generated projects expose their application commands through the visible Cargo
