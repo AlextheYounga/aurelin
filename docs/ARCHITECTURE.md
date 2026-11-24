@@ -366,6 +366,26 @@ own their callbacks, dependencies, names, expressions, and registration in
 run. Schedule builders validate configuration and produce immutable,
 cheaply-cloned schedules; no registry or scheduler thread is global.
 
+For example, an application can register its own async operation:
+
+```rust,ignore
+use aurelin_framework::scheduling::{ConfigurationError, Schedule, TaskBuilder};
+
+pub fn schedule() -> Result<Schedule, ConfigurationError> {
+    let mut schedule = Schedule::builder();
+    schedule.task(TaskBuilder::new("prune-records", "0 2 * * *", || async {
+        prune_records().await
+    }));
+    schedule.build()
+}
+```
+
+To prevent overlaps, supply the application's configured `Cache` with
+`schedule.cache(cache)` and add `.without_overlapping()` or
+`.overlap_lifetime(duration)` to the task. Capture any task dependencies
+explicitly in the callback. Choose a shared Redis store when separate scheduler
+processes must coordinate.
+
 The runner takes one explicit UTC instant (or reads the clock once through
 `run`) and evaluates its minute in each task's validated IANA timezone, UTC by
 default. Five-field cron expressions are parsed using the `cron` crate. Numeric
