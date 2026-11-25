@@ -313,6 +313,7 @@ does not by itself complete a capability.
 - [x] Implement reusable notifications with per-recipient mail channel selection.
 - [x] Add general application-facing mail composition and application-owned rendering conventions.
 - [x] Deliver composed mail through the existing Apalis queue and real worker boundary.
+- [x] Render and enqueue recipient-specific notifications as existing mail jobs.
 - [ ] Add queued notification objects, per-channel queue options, events, localization, and additional channels.
 
 ### Filesystems and uploads

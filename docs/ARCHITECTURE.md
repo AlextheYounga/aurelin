@@ -497,9 +497,13 @@ The example uses `queue::{self, BoxDynError, TaskSink, WorkerBuilder}` and
 application process, not as part of an HTTP request.
 
 Unlike Laravel's queued notifications, queued messages are rendered before
-enqueueing, and recipient models and arbitrary application notification objects
-are not serialized or restored. Per-channel queue connections, queues and
-delays, notification events, notification identifiers, locale selection,
+enqueueing. `NotificationDispatcher::queue` selects channels, renders and routes
+the message for each supplied recipient, then pushes the existing `MailMessage`
+job to an explicitly supplied SQLite queue. The caller registers the mail worker.
+Recipient models and arbitrary application notification objects are not
+serialized or restored. Queue failures are returned; earlier queued messages
+are not rolled back. Per-channel queue connections, queues and delays,
+notification events, notification identifiers, locale selection,
 Laravel's greeting/line/action renderer, Markdown/Blade mail, attachments,
 headers, and all other notification channels remain deferred. Notification
 events need a compatible event cancellation/response seam before being added;

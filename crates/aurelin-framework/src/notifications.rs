@@ -3,6 +3,8 @@
 use std::error::Error;
 
 use crate::mail::{MailError, MailMessage, Mailer};
+use crate::queue::TaskSink;
+use apalis_sqlite::SqliteStorage;
 
 /// An application error encountered while selecting or composing a notification.
 pub type NotificationError = Box<dyn Error + Send + Sync + 'static>;
@@ -70,16 +72,52 @@ impl NotificationDispatcher {
         for channel in channels {
             match channel {
                 Channel::Mail => {
-                    let message = notification.to_mail(recipient).map_err(DispatchError::Composition)?;
-                    let Some(address) = recipient.route_mail(notification).map_err(DispatchError::Routing)? else {
-                        continue;
-                    };
-                    self.mailer.send(message.routed_to(&address)?).await?;
+                    if let Some(message) = mail_message(recipient, notification)? {
+                        self.mailer.send(message).await?;
+                    }
                 }
             }
         }
         Ok(())
     }
+
+    /// Render recipient-specific mail and enqueue it on the existing mail queue.
+    ///
+    /// Content and addresses are persisted in the queue. Applications must
+    /// protect queue storage and register a worker that sends `MailMessage` jobs.
+    pub async fn queue<N, R>(
+        &self,
+        recipient: &R,
+        notification: &N,
+        queue: &mut SqliteStorage<MailMessage>,
+    ) -> Result<(), DispatchError>
+    where
+        N: Notification<R>,
+        R: MailRecipient<N>,
+    {
+        for channel in notification.via(recipient).map_err(DispatchError::Selection)? {
+            match channel {
+                Channel::Mail => {
+                    if let Some(message) = mail_message(recipient, notification)? {
+                        queue.push(message).await.map_err(|error| DispatchError::Queue(Box::new(error)))?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+fn mail_message<N, R>(recipient: &R, notification: &N) -> Result<Option<MailMessage>, DispatchError>
+where
+    N: Notification<R>,
+    R: MailRecipient<N>,
+{
+    let message = notification.to_mail(recipient).map_err(DispatchError::Composition)?;
+    let Some(address) = recipient.route_mail(notification).map_err(DispatchError::Routing)? else {
+        return Ok(None);
+    };
+    Ok(Some(message.routed_to(&address)?))
 }
 
 /// Failure to select, compose, route, or deliver a notification.
@@ -97,4 +135,7 @@ pub enum DispatchError {
     /// Message construction or transport failed.
     #[error("notification mail delivery failed")]
     Mail(#[from] MailError),
+    /// The rendered notification could not be enqueued.
+    #[error("notification queue dispatch failed")]
+    Queue(#[source] Box<dyn Error + Send + Sync>),
 }
