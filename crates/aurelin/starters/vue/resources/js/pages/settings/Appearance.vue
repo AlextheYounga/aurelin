@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { type Appearance, storedAppearance, updateAppearance } from '../../appearance';
 
-const appearance = ref<Appearance>(storedAppearance());
+const appearance = ref<Appearance>('system');
+onMounted(() => { appearance.value = storedAppearance(); });
 
 const update = (value: Appearance) => {
     appearance.value = value;
