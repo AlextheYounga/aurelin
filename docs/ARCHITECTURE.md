@@ -77,8 +77,12 @@ router.
 
 This is not a claim of complete protocol parity. The selected adapter documents
 SSR and asynchronous prop resolvers as unsupported, and validation error bags
-as partial. Those gaps must be addressed or reassessed when their associated
-starter behavior is implemented. The official `inertiajs/inertia-laravel-rust`
+as partial. `inertia_rs` 0.4 calls the HTML document callback synchronously;
+Aurelin marks that response with its script-safe page context and awaits the
+renderer in Axum middleware. The dependency still decides HTML versus JSON and
+handles version conflicts. This provides the backend SSR seam, but the generated
+frontends do not yet include the Node renderer entries or hydration builds.
+The official `inertiajs/inertia-laravel-rust`
 port was also inspected at its 2026-11-18 `main` branch: it is alpha,
 unpublished to crates.io, and requires Rust 1.99, so it is not a compatible v1
 dependency for the workspace's current Rust 1.97 toolchain.
