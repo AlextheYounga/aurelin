@@ -454,6 +454,17 @@ logs must therefore be protected as sensitive data. SMTP credentials are not
 part of the message. Applications own content and any renderer functions; there
 is no template engine or automatic HTML escaping.
 
+An explicitly configured event dispatcher receives `MessageSending` after
+message validation and before transport, and `MessageSent` after successful
+delivery. Stopping `MessageSending` cancels delivery; listener errors are
+returned. `MessageFailed` is an Aurelin extension, emitted for message-build or
+transport failures, not for listener failures. If its listener fails, that
+listener error replaces the delivery error. A sent-listener failure is returned
+after delivery and retries can duplicate mail. Event payloads contain rendered
+content and recipient addresses, but not transport credentials; protect listeners
+and logs accordingly. Laravel Framework 13.x `Mail/Mailer.php` defines the
+sending and sent events; it does not define a general `MessageFailed` event.
+
 The message is a concrete serializable Apalis job. Applications may push it to
 `queue::sqlite::<MailMessage>` using the existing `TaskSink` and run an Apalis
 worker whose handler calls `mailer.send(message)`. The worker must be explicitly

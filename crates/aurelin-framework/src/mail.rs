@@ -1,5 +1,6 @@
-use std::{collections::HashMap, num::ParseIntError};
+use std::{collections::HashMap, fmt, num::ParseIntError};
 
+use crate::events::{DispatchError, DispatchOutcome, EventDispatcher};
 use lettre::{
     AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
     address::AddressError,
@@ -12,15 +13,38 @@ use thiserror::Error;
 mod message;
 pub use message::MailMessage;
 
-#[derive(Clone, Debug)]
+/// Emitted after message construction, before transport delivery. Stopping
+/// propagation cancels delivery.
+pub struct MessageSending(pub MailMessage);
+
+/// Emitted after successful transport delivery.
+pub struct MessageSent(pub MailMessage);
+
+/// Emitted when message construction or transport delivery fails.
+pub struct MessageFailed(pub MailMessage);
+
+#[derive(Clone)]
 pub struct Mailer {
     transport: Option<AsyncSmtpTransport<Tokio1Executor>>,
     from: Option<Mailbox>,
+    events: Option<EventDispatcher>,
+}
+
+impl fmt::Debug for Mailer {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Mailer").field("smtp", &self.transport.is_some()).finish_non_exhaustive()
+    }
 }
 
 impl Mailer {
     pub fn log() -> Self {
-        Self { transport: None, from: None }
+        Self { transport: None, from: None, events: None }
+    }
+
+    /// Use the application's dispatcher for mail lifecycle events.
+    pub fn with_events(mut self, events: EventDispatcher) -> Self {
+        self.events = Some(events);
+        self
     }
 
     pub fn from_environment(environment: &HashMap<String, String>) -> Result<Self, MailError> {
@@ -33,7 +57,7 @@ impl Mailer {
                         address.parse().map(|address| Mailbox::new(environment.get("MAIL_FROM_NAME").cloned(), address))
                     })
                     .transpose()?;
-                Ok(Self { transport: None, from })
+                Ok(Self { transport: None, from, events: None })
             }
             "smtp" => Self::smtp(environment),
             mailer => Err(MailError::UnsupportedMailer(mailer.to_owned())),
@@ -45,11 +69,35 @@ impl Mailer {
             (None, None) => Some(Mailbox::new(None, "hello@example.com".parse()?)),
             _ => self.from.clone(),
         };
-        let message = message.build(from)?;
+        let built = match message.clone().build(from) {
+            Ok(built) => built,
+            Err(error) => {
+                self.failed(message).await?;
+                return Err(error);
+            }
+        };
+        if let Some(events) = &self.events {
+            if events.dispatch(MessageSending(message.clone())).await? == DispatchOutcome::Stopped {
+                return Ok(());
+            }
+        }
         if let Some(transport) = &self.transport {
-            transport.send(message).await?;
+            if let Err(error) = transport.send(built).await {
+                self.failed(message).await?;
+                return Err(error.into());
+            }
         } else {
-            tracing::info!(message = %String::from_utf8_lossy(&message.formatted()), "mail notification");
+            tracing::info!(message = %String::from_utf8_lossy(&built.formatted()), "mail notification");
+        }
+        if let Some(events) = &self.events {
+            events.dispatch(MessageSent(message)).await?;
+        }
+        Ok(())
+    }
+
+    async fn failed(&self, message: MailMessage) -> Result<(), MailError> {
+        if let Some(events) = &self.events {
+            events.dispatch(MessageFailed(message)).await?;
         }
         Ok(())
     }
@@ -78,7 +126,7 @@ impl Mailer {
         }
         let address = required(environment, "MAIL_FROM_ADDRESS")?.parse()?;
         let from = Mailbox::new(environment.get("MAIL_FROM_NAME").cloned(), address);
-        Ok(Self { transport: Some(builder.build()), from: Some(from) })
+        Ok(Self { transport: Some(builder.build()), from: Some(from), events: None })
     }
 }
 
@@ -104,4 +152,7 @@ pub enum MailError {
     Message(#[from] LettreError),
     #[error("SMTP delivery failed")]
     Delivery(#[from] SmtpError),
+    /// A lifecycle listener failed.
+    #[error(transparent)]
+    Event(#[from] DispatchError),
 }
