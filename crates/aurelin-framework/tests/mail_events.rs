@@ -1,5 +1,6 @@
 use std::{
     convert::Infallible,
+    io,
     sync::{Arc, Mutex},
 };
 
@@ -75,7 +76,7 @@ async fn sending_listener_can_cancel_delivery_without_sent_or_failed_event() {
 async fn failing_sending_listener_aborts_delivery_without_emitting_transport_failure() {
     let failures = Arc::new(Mutex::new(0));
     let mut events = EventDispatcher::builder();
-    events.listen(|_: Arc<MessageSending>| async { Err::<(), _>(std::io::Error::other("listener failure")) });
+    events.listen(|_: Arc<MessageSending>| async { Err::<(), _>(io::Error::other("listener failure")) });
     let observed = Arc::clone(&failures);
     events.listen(move |_: Arc<MessageFailed>| {
         let observed = Arc::clone(&observed);

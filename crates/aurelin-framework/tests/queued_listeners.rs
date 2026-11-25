@@ -1,4 +1,5 @@
 use std::{
+    convert::Infallible,
     error::Error,
     sync::{
         Arc,
@@ -13,6 +14,7 @@ use aurelin_framework::{
     queue::{self, BoxDynError, TaskSink, WorkerBuilder, WorkerContext},
 };
 use serde::{Deserialize, Serialize};
+use tokio::time::timeout;
 
 struct OrderPlaced {
     number: u32,
@@ -77,10 +79,7 @@ async fn independent_sqlite_workers_execute_example_mail_and_queued_listener_job
                 Ok::<(), BoxDynError>(())
             }
         });
-    tokio::time::timeout(Duration::from_secs(15), async {
-        tokio::try_join!(listener.run(), example.run(), mail.run())
-    })
-    .await??;
+    timeout(Duration::from_secs(15), async { tokio::try_join!(listener.run(), example.run(), mail.run()) }).await??;
     assert_eq!(observed.load(Ordering::SeqCst), 50);
     Ok(())
 }
@@ -102,7 +101,7 @@ async fn queued_listener_enqueue_failure_stops_later_synchronous_listeners() -> 
         let captured = Arc::clone(&captured);
         async move {
             captured.fetch_add(1, Ordering::SeqCst);
-            Ok::<_, std::convert::Infallible>(())
+            Ok::<_, Infallible>(())
         }
     });
     assert!(events.build().dispatch(OrderPlaced { number: 1 }).await.is_err());

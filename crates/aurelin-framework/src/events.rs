@@ -1,3 +1,4 @@
+use serde::{Serialize, de::DeserializeOwned};
 use std::{
     any::{Any, TypeId, type_name},
     collections::HashMap,
@@ -78,7 +79,7 @@ impl EventDispatcherBuilder {
     pub fn listen_queued<Event, Job, Map>(&mut self, queue: apalis_sqlite::SqliteStorage<Job>, map: Map) -> &mut Self
     where
         Event: Send + Sync + 'static,
-        Job: serde::Serialize + serde::de::DeserializeOwned + Send + Sync + 'static,
+        Job: Serialize + DeserializeOwned + Send + Sync + 'static,
         Map: Fn(&Event) -> Job + Send + Sync + 'static,
     {
         use crate::queue::TaskSink;
