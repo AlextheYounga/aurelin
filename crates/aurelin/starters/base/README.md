@@ -7,6 +7,7 @@ cargo aurelin serve
 Run `cargo aurelin` to list every command provided by the application.
 Application migrations live in `database/migrations/`; run them with `cargo
 aurelin migrate`.
+Agent-focused Aurelin skills and framework guidance live in `.agents/`.
 Add application-specific commands in `src/console/mod.rs` and delegate their
 business work to focused application modules.
 

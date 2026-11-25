@@ -6,6 +6,11 @@ use std::{
 const EXCLUDED_DIRECTORIES: &[&str] = &[".git", "node_modules", "target", "dist"];
 const REQUIRED_TEMPLATE_FILES: &[&str] = &[
     "authentication/.env.example",
+    "base/.agents/README.md",
+    "base/.agents/docs/aurelin.md",
+    "base/.agents/skills/aurelin-development/SKILL.md",
+    "base/.agents/skills/aurelin-data-and-jobs/SKILL.md",
+    "base/.agents/skills/aurelin-testing-and-debugging/SKILL.md",
     "base/.cargo/config.toml",
     "base/.env.example",
     "base/.gitignore",

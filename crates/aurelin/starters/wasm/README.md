@@ -1,5 +1,7 @@
 # Aurelin Leptos application
 
+Agent-focused Aurelin skills and framework guidance live in `.agents/`.
+
 Install the stable WebAssembly target and `cargo-leptos`, then run:
 
 ```sh

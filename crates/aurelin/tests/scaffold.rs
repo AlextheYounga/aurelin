@@ -126,6 +126,42 @@ fn generated_wasm_projects_include_required_hidden_configuration() -> TestResult
 }
 
 #[test]
+fn generated_projects_include_aurelin_agent_skills_and_reference_documentation() -> TestResult {
+    let directory = TempDir::new()?;
+    for frontend in [None, Some("react"), Some("vue"), Some("wasm")] {
+        let name = frontend.unwrap_or("backend");
+        let destination = directory.path().join(name);
+        let mut command = Command::new(env!("CARGO_BIN_EXE_aurelin"));
+        command.args(["new", "--no-interaction"]).arg(&destination).arg("--framework-path").arg(framework());
+        if let Some(frontend) = frontend {
+            command.args(["--frontend", frontend]);
+        }
+        let result = command.output()?;
+
+        assert!(result.status.success(), "{name}: {}", String::from_utf8_lossy(&result.stderr));
+        for path in [
+            ".agents/README.md",
+            ".agents/docs/aurelin.md",
+            ".agents/skills/aurelin-development/SKILL.md",
+            ".agents/skills/aurelin-data-and-jobs/SKILL.md",
+            ".agents/skills/aurelin-testing-and-debugging/SKILL.md",
+        ] {
+            assert!(destination.join(path).is_file(), "{name} project is missing {path}");
+        }
+
+        let development = fs::read_to_string(destination.join(".agents/skills/aurelin-development/SKILL.md"))?;
+        assert!(development.contains("name: aurelin-development"));
+        assert!(development.contains("../../docs/aurelin.md"));
+        let reference = fs::read_to_string(destination.join(".agents/docs/aurelin.md"))?;
+        assert!(reference.contains("Use Axum extractors"));
+        assert!(reference.contains("Use SeaORM for application persistence"));
+        assert!(reference.contains("cargo aurelin migrate"));
+        assert!(fs::read_to_string(destination.join("README.md"))?.contains("guidance live in `.agents/`"));
+    }
+    Ok(())
+}
+
+#[test]
 fn non_interactive_generation_requires_a_destination() -> TestResult {
     let result = Command::new(env!("CARGO_BIN_EXE_aurelin")).args(["new", "--no-interaction"]).output()?;
     assert!(!result.status.success());

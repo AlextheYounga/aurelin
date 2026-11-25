@@ -11,6 +11,7 @@ cargo aurelin dev
 
 Run `cargo aurelin` to list every command provided by the application. Use
 `cargo aurelin serve` to start only the HTTP server without Vite.
+Agent-focused Aurelin skills and framework guidance live in `.agents/`.
 Add application commands in `src/console/mod.rs`; keep their handlers thin and
 delegate business work to the actions in `src/actions/`.
 
