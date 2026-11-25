@@ -16,6 +16,7 @@ use validator::{Validate, ValidationErrors as ValidatorInputErrors};
 
 use super::{
     AuthSession, FortifyBackend, FortifyFrontend, FortifyHttpError,
+    events::{self, PasswordReset},
     feedback::{FLASH_ERRORS, FLASH_STATUS, ValidationErrors, redirect_with_error},
 };
 
@@ -186,6 +187,7 @@ async fn store_reset_password<B: FortifyBackend>(
         return redirect_with_error(&auth, &request, ("email", "This password reset token is invalid."), &destination)
             .await;
     }
+    events::observe(auth.backend.authentication_events(), PasswordReset { email: input.email }).await;
     auth.session.insert(FLASH_STATUS, "Your password has been reset.").await?;
     Ok(request.redirect(Inertia::redirect("/login"))?)
 }

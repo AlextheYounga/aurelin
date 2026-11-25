@@ -187,6 +187,21 @@ Successful credential validation also replaces bcrypt hashes whose cost no
 longer matches the application's configured default before the session or
 two-factor challenge continues.
 
+The public reset-link response deliberately differs from Fortify's default:
+unknown users and throttled requests receive the same success feedback as a
+sent link. Token throttling still applies. Token creation and notification are
+timeboxed to the authentication minimum; work exceeding that minimum can still
+affect response time. Backend and delivery failures are logged without account
+details and do not change the public response.
+
+Applications may explicitly expose the framework event dispatcher through
+`FortifyBackend::authentication_events`. Fortify emits observational `Login`,
+`Failed`, `Lockout`, `Registered`, `PasswordReset`, `Verified`, and `Logout`
+events for the implemented Axum workflows. Payloads omit credentials and
+request/session data. Listener errors and stop signals cannot change the auth
+result; as with the framework dispatcher, they stop later listeners for that
+event. A listener failure is logged without its potentially sensitive details.
+
 Login, registration, and password-reset routes enforce Fortify's guest-only
 boundary for both views and submissions. Password confirmation uses Fortify's
 `/user/confirm-password` route, verifies the current password, and records the

@@ -11,6 +11,7 @@ use aurelin_framework::{
         http::StatusCode,
         response::{Html, IntoResponse, Response},
     },
+    events::EventDispatcher,
     inertia::axum::{HtmlResponseContext, InertiaError},
 };
 use axum_login::{AuthUser, AuthnBackend};
@@ -26,6 +27,7 @@ pub const DEFAULT_AUTHENTICATION_TIMEBOX_DURATION: Duration = Duration::from_mil
 mod authentication;
 mod authentication_workflow;
 mod email_verification;
+pub mod events;
 mod feedback;
 mod login_session;
 mod passkeys;
@@ -107,6 +109,11 @@ pub trait FortifyBackend:
 where
     Self::Error: Error + Send + Sync + 'static,
 {
+    /// Explicitly registered observational listeners; listener failures do not alter authentication.
+    fn authentication_events(&self) -> Option<&EventDispatcher> {
+        None
+    }
+
     fn authentication_timebox_duration(&self) -> Duration {
         DEFAULT_AUTHENTICATION_TIMEBOX_DURATION
     }

@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     AuthSession, EmailVerificationRequest, FortifyBackend, FortifyFrontend, FortifyHttpError, FortifyUser,
+    events::{self, Verified},
     feedback::{FLASH_STATUS, ValidationErrors},
 };
 
@@ -139,6 +140,7 @@ async fn verify_email<B: FortifyBackend>(
         let response = (StatusCode::FORBIDDEN, "Invalid or expired verification link").into_response();
         return Ok(with_rate_limit_headers(response, remaining));
     }
+    events::observe(auth.backend.authentication_events(), Verified { user_id: user.id() }).await;
     let response = request.redirect(Inertia::redirect("/dashboard?verified=1"))?;
     Ok(with_rate_limit_headers(response, remaining))
 }
