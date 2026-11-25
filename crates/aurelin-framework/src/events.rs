@@ -71,6 +71,24 @@ impl EventDispatcherBuilder {
         self
     }
 
+    /// Enqueue an application-owned job when an event is dispatched.
+    ///
+    /// The mapper selects the data stored in SQLite; the worker and handler are
+    /// registered separately. Enqueue errors stop subsequent listeners.
+    pub fn listen_queued<Event, Job, Map>(&mut self, queue: apalis_sqlite::SqliteStorage<Job>, map: Map) -> &mut Self
+    where
+        Event: Send + Sync + 'static,
+        Job: serde::Serialize + serde::de::DeserializeOwned + Send + Sync + 'static,
+        Map: Fn(&Event) -> Job + Send + Sync + 'static,
+    {
+        use crate::queue::TaskSink;
+        self.listen(move |event: Arc<Event>| {
+            let mut queue = queue.clone();
+            let job = map(&event);
+            async move { queue.push(job).await }
+        })
+    }
+
     /// Finish configuring the immutable dispatcher.
     pub fn build(&self) -> EventDispatcher {
         EventDispatcher { inner: Arc::new(EventDispatcherInner { listeners: self.listeners.clone() }) }

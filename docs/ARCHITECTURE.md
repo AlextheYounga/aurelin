@@ -408,9 +408,12 @@ ordering and failure semantics. Laravel's response arrays and `until` method
 are not included in this initial side-effect dispatcher because a typed Rust
 equivalent needs an actual response-producing consumer to establish its event
 response type. Wildcards, subscribers, discovery, deferred and after-commit
-events, broadcasting, and queued listeners also remain deferred. A future
-queued-listener adapter can register through the existing async listener seam
-and use Apalis without coupling this dispatcher to the queue today.
+events and broadcasting remain deferred. `listen_queued` maps an event to an
+explicit application-owned serializable job and pushes it to an Apalis SQLite
+queue in listener order. Enqueue failure stops later listeners; the worker runs
+separately and its eventual failure cannot roll back the original dispatch.
+Applications register a worker and handler for each job type. Queue payloads
+may contain sensitive data and must be protected, including failed jobs.
 
 Authentication events remain an unwired consumer of this foundation. Health and
 gate evaluation events are described in their respective sections.

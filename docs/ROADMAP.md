@@ -283,7 +283,7 @@ does not by itself complete a capability.
 - [x] Implement event dispatch and listener registration.
 - [x] Define synchronous listener ordering and failure behavior.
 - [x] Dispatch gate evaluation events when an application configures a dispatcher.
-- [ ] Integrate queued listeners after the queue boundary exists.
+- [x] Enqueue explicitly mapped serializable listener jobs through Apalis SQLite.
 
 ### Cache
 
