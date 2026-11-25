@@ -78,6 +78,33 @@ Generated applications use the matching Aurelin crates from crates.io. Aurelin
 contributors can pass `--framework-path` to test against a local framework
 checkout instead.
 
+### Personal access tokens
+
+React and Vue applications can opt into bearer-token API routes:
+
+```sh
+aurelin new my-app --frontend react --api
+```
+
+The backend-only and WASM starters do not currently support this option: they
+do not share the browser authentication composition used for token management.
+Run `cargo aurelin migrate` before serving the generated application.
+
+Browser sessions remain cookie-authenticated and CSRF-protected. A signed-in
+user can `POST /tokens` with a CSRF token and JSON such as
+`{"name":"laptop","abilities":["read"],"expires_at":null}`; the response
+contains the plaintext credential only once. `GET /tokens` lists the owner's
+metadata and `DELETE /tokens/{id}` revokes an owned token. Issuance is rate
+limited; wildcard (`*`) issuance is denied until the application explicitly
+changes its policy. Expiration is an optional Unix timestamp in seconds.
+
+Send `Authorization: Bearer <credential>` to `GET /api/user`, or
+`DELETE /api/token` to revoke the current credential. These routes do not accept
+session cookies as authentication, and bearer headers do not bypass CSRF on
+browser routes. Only a SHA-256 digest is stored; protect the plaintext token as
+a password. Abilities constrain token access but do not replace application
+authorization policies. This is not OAuth or JWT authentication.
+
 ## The Aurelin approach
 
 Rust has excellent web libraries. Aurelin does not hide or duplicate them. It
