@@ -1,3 +1,5 @@
+mod api;
+
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -12,6 +14,7 @@ use toml_edit::{DocumentMut, InlineTable, value};
 
 static STARTER: Dir<'_> = include_dir!("$OUT_DIR/starters/base");
 static AUTHENTICATION: Dir<'_> = include_dir!("$OUT_DIR/starters/authentication");
+static API: Dir<'_> = include_dir!("$OUT_DIR/starters/api");
 static FRONTEND: Dir<'_> = include_dir!("$OUT_DIR/starters/frontend");
 static REACT: Dir<'_> = include_dir!("$OUT_DIR/starters/react");
 static VUE: Dir<'_> = include_dir!("$OUT_DIR/starters/vue");
@@ -47,7 +50,20 @@ impl FrameworkSource {
     }
 }
 
-pub fn create(path: &Path, framework: &FrameworkSource, name: Option<&str>, frontend: Option<Frontend>) -> Result<()> {
+#[derive(Clone, Copy)]
+pub struct StarterOptions<'a> {
+    pub name: Option<&'a str>,
+    pub frontend: Option<Frontend>,
+    pub api: bool,
+}
+
+pub fn create(path: &Path, framework: &FrameworkSource, options: StarterOptions<'_>) -> Result<()> {
+    let StarterOptions { name, frontend, api } = options;
+    if api && !matches!(frontend, Some(Frontend::React | Frontend::Vue)) {
+        bail!(
+            "--api requires --frontend react or vue; backend-only and wasm starters do not yet support API token issuance"
+        );
+    }
     // Cargo owns project-name validation and refuses existing destinations.
     // Never use `cargo init`, which would adopt an existing directory.
     let mut cargo = Command::new("cargo");
@@ -60,17 +76,20 @@ pub fn create(path: &Path, framework: &FrameworkSource, name: Option<&str>, fron
         bail!("`cargo new` failed; no starter files were written");
     }
 
-    install(path, framework, frontend).with_context(|| {
+    install(path, framework, frontend, api).with_context(|| {
         format!("could not finish {} (partial project retained; no files were deleted)", path.display())
     })
 }
 
-fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>) -> Result<()> {
+fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>, api: bool) -> Result<()> {
     let manifest_path = path.join("Cargo.toml");
     let mut manifest = fs::read_to_string(&manifest_path)?.parse::<DocumentMut>()?;
     let crate_name = manifest["package"]["name"].as_str().context("generated package has no name")?.replace('-', "_");
     let dependencies = &mut manifest["dependencies"];
     dependencies["aurelin-framework"] = value(aurelin_dependency(framework, "aurelin-framework")?);
+    if api {
+        dependencies["aurelin-sanctum"] = value(aurelin_dependency(framework, "aurelin-sanctum")?);
+    }
     if frontend.is_some_and(Frontend::uses_authentication) {
         dependencies["aurelin-fortify"] = value(aurelin_dependency(framework, "aurelin-fortify")?);
     }
@@ -109,6 +128,10 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
         );
         dependency
     });
+    if api {
+        dependencies["sea-orm"].as_inline_table_mut().context("generated SeaORM dependency is not a table")?["features"]
+            .as_array_mut().context("generated SeaORM features are not an array")?.push("with-json");
+    }
     dependencies["sea-orm-migration"] = value({
         let mut dependency = InlineTable::new();
         dependency.insert("version", "1.1".into());
@@ -183,9 +206,14 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
             }
         }
     }
+    if api {
+        API.extract(path).context("extract the API starter")?;
+        api::install_api_registration(path)?;
+    }
     for source in [
         path.join("src/main.rs"),
         path.join("tests/application.rs"),
+        path.join("tests/api.rs"),
         path.join("tests/authentication.rs"),
         path.join("tests/email_verification.rs"),
         path.join("tests/jobs.rs"),

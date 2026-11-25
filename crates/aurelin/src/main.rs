@@ -35,6 +35,9 @@ enum Commands {
         /// Install a React, Vue, or full-stack Rust/WASM frontend
         #[arg(long, value_enum)]
         frontend: Option<scaffold::Frontend>,
+        /// Install personal access token API support (React or Vue starter)
+        #[arg(long)]
+        api: bool,
         /// Never prompt; omitted options use their non-interactive defaults
         #[arg(long)]
         no_interaction: bool,
@@ -55,12 +58,12 @@ fn main() -> ExitCode {
 
 fn run(cli: Cli) -> Result<()> {
     match cli.command {
-        Commands::New { path, framework_path, name, frontend, no_interaction } => {
+        Commands::New { path, framework_path, name, frontend, api, no_interaction } => {
             let interactive = !no_interaction && io::stdin().is_terminal() && io::stderr().is_terminal();
             let path = destination(path, interactive)?;
             let frontend = select_frontend(frontend, interactive)?;
             let framework = scaffold::FrameworkSource::resolve(framework_path)?;
-            scaffold::create(&path, &framework, name.as_deref(), frontend)?;
+            scaffold::create(&path, &framework, scaffold::StarterOptions { name: name.as_deref(), frontend, api })?;
             print_next_steps(&path, frontend);
         }
         Commands::Completions { shell } => {

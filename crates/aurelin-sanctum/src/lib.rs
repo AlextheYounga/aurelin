@@ -1,5 +1,6 @@
-//! Personal access token building blocks. HTTP and persistence integration are
-//! not yet provided; these primitives alone do not authenticate requests.
+//! Personal access token services and bearer HTTP middleware.
+//! Applications provide persistence through [`TokenRepository`] and explicitly
+//! compose bearer-only routes separately from session and CSRF middleware.
 
 mod abilities;
 mod http;
