@@ -199,7 +199,7 @@ async fn issued_token_authenticates_bearer_only_and_can_be_revoked() -> Result<(
                 .body(Body::from(r#"{"name":"x","abilities":[]}"#))?,
         )
         .await?;
-    assert_ne!(no_csrf.status(), StatusCode::CREATED);
+    assert_eq!(no_csrf.status(), StatusCode::FORBIDDEN);
     let revoke_request = Request::builder()
         .method(Method::DELETE)
         .uri("/api/token")
