@@ -16,6 +16,7 @@ apalis = "=1.1.1"
 apalis-sqlite = "=1.1.1"
 async-trait = "0.1"
 axum = "0.8"
+axum-valid = { version = "0.25", default-features = false, features = ["validator", "json", "form", "query"] }
 axum_typed_multipart = { version = "0.17", default-features = false, features = ["tempfile_3"] }
 axum-login = "0.18"
 axum-tower-sessions-csrf = { version = "=0.1.1", optional = true }

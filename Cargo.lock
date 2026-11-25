@@ -455,6 +455,7 @@ dependencies = [
  "axum",
  "axum-login",
  "axum-tower-sessions-csrf",
+ "axum-valid",
  "axum_typed_multipart",
  "base64 0.22.1",
  "bcrypt",

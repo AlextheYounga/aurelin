@@ -102,6 +102,15 @@ Applications still use these libraries through their native APIs. Aurelin is
 the convention and integration layer, not a second abstraction over
 everything beneath it.
 
+For JSON APIs, `aurelin_framework::validation::http::Validated` composes
+`validator` and Axum extractors for JSON, forms, query strings, and paths. It
+returns safe JSON errors, including structured rule codes, on invalid input.
+Apply authorization in an outer route layer or an earlier parts extractor:
+authorization inside the handler runs after validation. These extractors do not
+yet implement browser or Inertia validation redirects and session flashing.
+Applications may opt into `http::errors::AppError` and register their own Axum
+404/405 fallbacks; this does not change existing authentication responses.
+
 ## Packages
 
 | Package | Responsibility |
