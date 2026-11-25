@@ -5,6 +5,8 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
+pub mod errors;
+
 pub fn too_many_attempts(limit: u32, retry_after: Duration) -> Response {
     let retry_after = retry_after.as_secs().max(1);
     let mut response = (StatusCode::TOO_MANY_REQUESTS, "Too Many Attempts.").into_response();
