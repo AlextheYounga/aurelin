@@ -264,9 +264,10 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 ### Data and persistence
 
 - [ ] Define general SeaORM model, relationship, and query conventions.
-- [ ] Support application migrations outside the starter's auth schema.
+- [x] Support application migrations outside the starter's auth schema (SQLite post example).
 - [ ] Add database transactions and data-integrity conventions.
-- [ ] Add factories and seed data workflows.
+- [x] Add an application-owned deterministic post factory and explicit seed command (SQLite starters).
+- [ ] Expand factory and seeder conventions beyond the initial example.
 - [ ] Qualify supported database drivers beyond SQLite.
 
 ### Authorization, configuration, and tooling

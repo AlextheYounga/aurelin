@@ -161,6 +161,10 @@ data access, SeaQuery-backed `sea-orm-migration` owns the SQLite schema, and
 SQLx remains SeaORM's driver and the Tower session-store infrastructure.
 Authenticated startup checks for pending migrations without applying them,
 including for in-memory SQLite; migrations are an explicit command or test setup.
+Authenticated applications own the example post entity, migration, seeded fake
+factory, and seeder registration; the console explicitly runs that registration
+and requires `--force` in production. The base registration is empty. These are
+application examples, not a reusable ORM or factory facade.
 `axum-valid` integrates `validator` with Axum request extraction. `axum-login`
 0.18 provides authenticated sessions and session-ID rotation, and
 `axum-tower-sessions-csrf` 0.1.1 validates state-changing requests.

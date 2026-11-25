@@ -25,7 +25,9 @@ pub mod console;
 #[cfg(feature = "ssr")]
 pub mod database;
 #[cfg(feature = "ssr")]
-mod entities;
+pub mod entities;
+#[cfg(feature = "ssr")]
+pub mod factory;
 #[cfg(feature = "ssr")]
 pub mod jobs;
 #[cfg(feature = "ssr")]
@@ -35,6 +37,8 @@ mod migrations;
 pub mod routes;
 #[cfg(feature = "ssr")]
 pub mod schedule;
+#[cfg(feature = "ssr")]
+pub mod seed;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]

@@ -65,6 +65,7 @@ fn react_and_vue_projects_compile_and_test_their_inertia_boundaries() -> Result<
             "migrate:status",
             "migrate:rollback",
             "migrate:fresh",
+            "db:seed",
             "queue:work",
             "queue:failed",
             "queue:retry",
@@ -99,6 +100,25 @@ fn react_and_vue_projects_compile_and_test_their_inertia_boundaries() -> Result<
         let migration_status = String::from_utf8(migration_status.stdout)?;
         assert!(migration_status.contains("Applied"));
         assert!(migration_status.contains("m20261118_000001_create_auth_tables"));
+        assert!(migration_status.contains("m20261125_000001_create_posts"));
+
+        let denied = Command::new("cargo")
+            .args(["aurelin", "db:seed"])
+            .env("APP_ENV", "production")
+            .env("CARGO_TARGET_DIR", &target)
+            .current_dir(&destination)
+            .output()?;
+        assert!(!denied.status.success());
+        assert!(String::from_utf8_lossy(&denied.stderr).contains("without --force"));
+
+        let forced = Command::new("cargo")
+            .args(["aurelin", "db:seed", "--force"])
+            .env("APP_ENV", "production")
+            .env("CARGO_TARGET_DIR", &target)
+            .current_dir(&destination)
+            .output()?;
+        assert!(!forced.status.success());
+        assert!(String::from_utf8_lossy(&forced.stderr).contains("requires an existing user"));
 
         assert!(destination.join("package-lock.json").is_file());
         let vite_config = fs::read_to_string(destination.join("vite.config.ts"))?;

@@ -72,6 +72,7 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
     let dependencies = &mut manifest["dependencies"];
     dependencies["aurelin-framework"] = value(aurelin_dependency(framework, "aurelin-framework")?);
     if frontend.is_some_and(Frontend::uses_authentication) {
+        dependencies["fake"] = value("5");
         dependencies["aurelin-fortify"] = value(aurelin_dependency(framework, "aurelin-fortify")?);
     }
     let mut tokio = InlineTable::new();
@@ -187,6 +188,7 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
         path.join("src/main.rs"),
         path.join("tests/application.rs"),
         path.join("tests/authentication.rs"),
+        path.join("tests/data.rs"),
         path.join("tests/email_verification.rs"),
         path.join("tests/jobs.rs"),
         path.join("tests/mail_delivery.rs"),
@@ -263,6 +265,7 @@ fn install_wasm_manifest(manifest: &mut DocumentMut) -> Result<()> {
         "tower-sessions-sqlx-store",
         "urlencoding",
         "validator",
+        "fake",
     ];
     for dependency in server_dependencies {
         make_optional(dependencies, dependency);
@@ -290,6 +293,7 @@ fn install_wasm_manifest(manifest: &mut DocumentMut) -> Result<()> {
         "dep:tower-sessions-sqlx-store",
         "dep:urlencoding",
         "dep:validator",
+        "dep:fake",
         "dep:leptos_axum",
         "leptos/ssr",
         "leptos_meta/ssr",

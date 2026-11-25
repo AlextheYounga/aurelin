@@ -25,6 +25,12 @@ pagination response convention is established yet. SeaORM's `DbErr` and
 transaction errors should be preserved until a boundary can meaningfully
 handle them.
 
+The authenticated starters include a small application-owned `Post` example:
+`posts.user_id` references `users.id`, and both entities declare the SeaORM
+relationship. For example, `user::Entity::find().find_with_related(post::Entity)
+.all(&db).await?` loads users and their posts without a query per user. The
+posts migration and relation are ordinary application files, not framework APIs.
+
 ## Migrations
 
 Add application migrations under `database/migrations/`, declare each module in
@@ -51,11 +57,16 @@ query in that operation. Alternatively use `begin`, then explicitly `commit`
 or `rollback`; an uncommitted transaction is rolled back on drop. Avoid external
 side effects inside a transaction if they cannot be rolled back.
 
-Factories and seeders are not yet provided by generated applications. There is
-no `db:seed` command or registration seam. Applications can define their own
-typed constructors and seed operations using SeaORM and `fake`, with an explicit
-seeded random generator where reproducibility matters. Do not assume fake data
-is unique or safe for production.
+Authenticated starters provide `factory::post(user_id, seed)`, returning a
+SeaORM active model with values generated using `fake` and a seeded RNG. The
+same seed and dependency versions produce the same attributes; fake data is
+not guaranteed unique or safe for production. Insert it explicitly with SeaORM.
+
+`cargo aurelin db:seed` runs the application registration in `src/seed.rs`;
+it is never run by startup or migrations. The authenticated example requires
+an existing user and adds one post for the lowest user ID on every run. It is
+intentionally **not idempotent**; neither is seeding generally. The base starter
+registers no seeders. Errors propagate, and production requires `--force`.
 
 References: Laravel 13 documentation for [models](https://laravel.com/docs/13.x/eloquent),
 [relationships](https://laravel.com/docs/13.x/eloquent-relationships),

@@ -57,7 +57,7 @@ async fn startup_requires_explicit_migrations_for_memory_and_file_databases()
         "startup created application tables: {tables:?}"
     );
     __AURELIN_CRATE__::database::migrate(&url).await?;
-    application(
+    let _app = application(
         Frontend::new(),
         &url,
         false,
