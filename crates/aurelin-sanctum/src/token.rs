@@ -81,7 +81,8 @@ pub struct TokenCreation<'a, Owner> {
 }
 
 /// Application persistence boundary. Implementations must scope management to
-/// the owner and atomically refuse a last-used update after revocation.
+/// the owner and atomically refuse a last-used update after revocation or
+/// expiration, including when the record changes between lookup and update.
 pub trait TokenRepository: Send + Sync {
     type Owner: Send + Sync;
     type Error: Error + Send + Sync + 'static;
@@ -90,6 +91,17 @@ pub trait TokenRepository: Send + Sync {
     fn find(&self, id: u64) -> impl Future<Output = Result<Option<StoredToken<Self::Owner>>, Self::Error>> + Send;
     fn mark_used(&self, id: u64, digest: &str, now: i64) -> impl Future<Output = Result<bool, Self::Error>> + Send;
     fn revoke(&self, owner: &Self::Owner, id: u64) -> impl Future<Output = Result<bool, Self::Error>> + Send;
+    fn list(&self, owner: &Self::Owner) -> impl Future<Output = Result<Vec<TokenMetadata>, Self::Error>> + Send;
+}
+
+/// Public metadata deliberately excludes the token digest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TokenMetadata {
+    pub id: u64,
+    pub name: String,
+    pub abilities: Abilities,
+    pub expires_at: Option<i64>,
+    pub last_used_at: Option<i64>,
 }
 
 /// Repository result; intentionally has no Debug implementation because it
