@@ -17,6 +17,7 @@ pub mod scheduling;
 pub mod session;
 pub mod signed_url;
 pub mod storage;
+pub mod telemetry;
 pub mod timebox;
 pub mod uploads;
 pub mod validation;

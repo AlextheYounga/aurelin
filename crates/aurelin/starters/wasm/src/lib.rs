@@ -1,11 +1,7 @@
 pub mod app;
 
 #[cfg(feature = "ssr")]
-use std::{
-    error::Error,
-    io::{self, IsTerminal},
-    path::Path,
-};
+use std::{error::Error, path::Path};
 
 #[cfg(feature = "ssr")]
 use aurelin_framework::configuration::{ServerConfig, environment};
@@ -49,11 +45,8 @@ pub fn hydrate() {
 
 #[cfg(feature = "ssr")]
 pub async fn run() -> Result<(), Box<dyn Error>> {
-    tracing_subscriber::fmt()
-        .with_ansi(io::stderr().is_terminal())
-        .with_writer(io::stderr)
-        .init();
     let environment = environment(Path::new("."))?;
+    aurelin_framework::telemetry::init(Path::new("."), &environment)?;
     console::run(environment).await
 }
 

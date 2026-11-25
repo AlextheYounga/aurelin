@@ -145,6 +145,7 @@ pub fn schedule() -> Result<Schedule, ConfigurationError> {
         .current_dir(&destination)
         .env_clear()
         .env("SERVER_PORT", "0")
+        .env("ASSIST_LOG", "true")
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -162,6 +163,10 @@ pub fn schedule() -> Result<Schedule, ConfigurationError> {
     let home = request(address, "GET", "/")?;
     assert!(home.starts_with("HTTP/1.1 200"), "{home}");
     assert!(home.ends_with("Welcome to Aurelin"), "{home}");
+    let log_files = fs::read_dir(destination.join("storage/logs"))?.collect::<Result<Vec<_>, _>>()?;
+    let log = fs::read_to_string(log_files[0].path())?;
+    assert!(log.contains("\"level\":\"INFO\""), "{log}");
+    assert!(log.contains(&address.to_string()), "{log}");
     assert!(request(address, "GET", "/missing")?.starts_with("HTTP/1.1 404"));
     assert!(request(address, "POST", "/")?.starts_with("HTTP/1.1 405"));
     let health = request_with_headers(address, "GET", "/up", &[("Accept", "application/json")])?;

@@ -1,4 +1,5 @@
 mod api;
+mod telemetry;
 
 use std::{
     fs,
@@ -102,7 +103,6 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>,
     );
     dependencies["tokio"] = value(tokio);
     dependencies["tracing"] = value("0.1");
-    dependencies["tracing-subscriber"] = value("0.3");
     dependencies["clap"] = value({
         let mut dependency = InlineTable::new();
         dependency.insert("version", "4".into());
@@ -179,6 +179,7 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>,
     if frontend == Some(Frontend::Wasm) {
         install_wasm_manifest(&mut manifest)?;
     }
+    telemetry::install(&mut manifest, frontend == Some(Frontend::Wasm));
     let mut tower = InlineTable::new();
     tower.insert("version", "0.5".into());
     tower.insert("features", ["util"].into_iter().collect::<toml_edit::Array>().into());
@@ -281,7 +282,6 @@ fn install_wasm_manifest(manifest: &mut DocumentMut) -> Result<()> {
         "aurelin-fortify",
         "tokio",
         "tracing",
-        "tracing-subscriber",
         "clap",
         "serde_json",
         "serde",
@@ -309,7 +309,6 @@ fn install_wasm_manifest(manifest: &mut DocumentMut) -> Result<()> {
         "dep:aurelin-fortify",
         "dep:tokio",
         "dep:tracing",
-        "dep:tracing-subscriber",
         "dep:clap",
         "dep:serde_json",
         "dep:serde",

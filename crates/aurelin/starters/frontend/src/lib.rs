@@ -1,8 +1,4 @@
-use std::{
-    error::Error,
-    io::{self, IsTerminal},
-    path::Path,
-};
+use std::{error::Error, path::Path};
 
 use aurelin_framework::configuration::{ServerConfig, environment};
 use tokio::net::TcpListener;
@@ -24,11 +20,8 @@ pub mod schedule;
 pub mod seed;
 
 pub async fn run() -> Result<(), Box<dyn Error>> {
-    tracing_subscriber::fmt()
-        .with_ansi(io::stderr().is_terminal())
-        .with_writer(io::stderr)
-        .init();
     let environment = environment(Path::new("."))?;
+    aurelin_framework::telemetry::init(Path::new("."), &environment)?;
     console::run(environment).await
 }
 
