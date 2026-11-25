@@ -468,8 +468,8 @@ sending and sent events; it does not define a general `MessageFailed` event.
 The message is a concrete serializable Apalis job. Applications may push it to
 `queue::sqlite::<MailMessage>` using the existing `TaskSink` and run an Apalis
 worker whose handler calls `mailer.send(message)`. The worker must be explicitly
-registered: the generated `queue:work` currently handles only the application's
-example job. The queued message stores rendered bodies and addresses in SQLite,
+registered: the generated `queue:work` registers workers for the application's
+example job, example listener job, and rendered mail. The queued message stores rendered bodies and addresses in SQLite,
 including failed-job payloads; protect queue storage accordingly. Addresses
 are revalidated on deserialization and credentials are never serialized.
 Retries may deliver duplicates if an SMTP server accepted a message before a
@@ -597,15 +597,23 @@ sink and worker types rather than inventing a second queue API.
 Generated applications own their serializable job types and handlers. The
 starter includes an example job, a dispatch function, and a `cargo aurelin
 queue:work` process using the same `DATABASE_URL` as the application. Generated
-application tests dispatch through SQLite and process the job through a real
-worker. Queue tables are application-owned migrations, so dispatch and workers
+application tests dispatch three concrete job types through SQLite and process
+them through the application's Apalis monitor, including shutdown. The worker
+uses the same mail environment configuration as the application. Queue tables
+are application-owned migrations, so dispatch and workers
 fail with migration guidance instead of creating schema during startup. Apalis
 persists attempts and terminal failures in its durable job rows; Aurelin exposes
 those rows through `queue:failed`, `queue:retry`, `queue:forget`, and
 `queue:flush`. This deliberately avoids duplicating each terminal job into a
 second Laravel-shaped `failed_jobs` table: retry resets the durable row before a
-worker claims it again. Per-job backoff, worker timeouts, additional queue
-drivers, batching, and chaining remain future parity work.
+worker claims it again. Apalis 1.1.1 exposes the `WorkerBuilderExt::timeout`
+Tower middleware and `RetryPolicy::with_backoff`, as well as task retry metadata.
+These middleware retries wait within the worker; the existing SQLite durable
+attempt/failure conventions have not been qualified with those middleware layers
+or across worker restarts. The SQLite `poll_with_backoff` API changes idle polling,
+not failed-job retry timing. Aurelin therefore does not yet expose or claim
+Laravel-style durable per-job timeout/backoff semantics. Additional queue drivers,
+batching, and chaining remain future work.
 
 ## Growth rule
 
