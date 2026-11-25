@@ -16,6 +16,7 @@ apalis = "=1.1.1"
 apalis-sqlite = "=1.1.1"
 async-trait = "0.1"
 axum = "0.8"
+axum_typed_multipart = { version = "0.17", default-features = false, features = ["tempfile_3"] }
 axum-login = "0.18"
 axum-tower-sessions-csrf = { version = "=0.1.1", optional = true }
 base64 = "0.22"
@@ -26,6 +27,7 @@ chrono-tz = "0.10"
 cron = "0.17"
 constant_time_eq = { version = "0.4", optional = true }
 dotenvy = "0.15"
+futures-util = "0.3"
 fred = { version = "=10.1.0", features = ["i-scripts"] }
 hmac = "0.12"
 hkdf = "0.12"
@@ -33,6 +35,7 @@ lettre = { version = "0.11.19", default-features = false, features = ["builder",
 leptos_axum = { version = "0.8.8", optional = true }
 inertia_rs = { version = "0.4", default-features = false, features = ["axum"] }
 moka = { version = "=0.12.16", features = ["future"] }
+object_store = "=0.14.2"
 rand = "0.9"
 reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 sea-orm = { version = "1.1", default-features = false, features = ["runtime-tokio-rustls", "sqlx-sqlite"] }
@@ -42,11 +45,13 @@ serde_json = "1"
 sha1 = "0.11"
 sha2 = "0.10"
 sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite"] }
+tempfile = "3"
 thiserror = "2"
-tokio = { version = "1", features = ["rt", "sync", "time"] }
+tokio = { version = "1", features = ["fs", "io-util", "rt", "sync", "time"] }
 tower = "0.5"
 tower-sessions = "0.14"
 tracing = "0.1"
+url = "2"
 
 [lints]
 workspace = true

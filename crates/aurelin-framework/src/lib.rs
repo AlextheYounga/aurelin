@@ -16,8 +16,11 @@ pub mod queue;
 pub mod scheduling;
 pub mod session;
 pub mod signed_url;
+pub mod storage;
 pub mod timebox;
+pub mod uploads;
 pub mod view;
 
 pub use axum;
+pub use axum_typed_multipart;
 pub use inertia_rs as inertia;
