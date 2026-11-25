@@ -23,6 +23,15 @@ pub struct MessageSent(pub MailMessage);
 /// Emitted when message construction or transport delivery fails.
 pub struct MessageFailed(pub MailMessage);
 
+/// Whether the transport accepted a message or a listener cancelled it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SendOutcome {
+    /// The transport accepted the message.
+    Sent,
+    /// A sending listener cancelled delivery.
+    Cancelled,
+}
+
 #[derive(Clone)]
 pub struct Mailer {
     transport: Option<AsyncSmtpTransport<Tokio1Executor>>,
@@ -65,6 +74,11 @@ impl Mailer {
     }
 
     pub async fn send(&self, message: MailMessage) -> Result<(), MailError> {
+        self.send_with_outcome(message).await.map(|_| ())
+    }
+
+    /// Send mail while distinguishing cancellation from transport acceptance.
+    pub async fn send_with_outcome(&self, message: MailMessage) -> Result<SendOutcome, MailError> {
         let from = match (&self.from, &self.transport) {
             (None, None) => Some(Mailbox::new(None, "hello@example.com".parse()?)),
             _ => self.from.clone(),
@@ -78,7 +92,7 @@ impl Mailer {
         };
         if let Some(events) = &self.events {
             if events.dispatch(MessageSending(message.clone())).await? == DispatchOutcome::Stopped {
-                return Ok(());
+                return Ok(SendOutcome::Cancelled);
             }
         }
         if let Some(transport) = &self.transport {
@@ -92,7 +106,7 @@ impl Mailer {
         if let Some(events) = &self.events {
             events.dispatch(MessageSent(message)).await?;
         }
-        Ok(())
+        Ok(SendOutcome::Sent)
     }
 
     async fn failed(&self, message: MailMessage) -> Result<(), MailError> {

@@ -314,7 +314,9 @@ does not by itself complete a capability.
 - [x] Add general application-facing mail composition and application-owned rendering conventions.
 - [x] Deliver composed mail through the existing Apalis queue and real worker boundary.
 - [x] Render and enqueue recipient-specific notifications as existing mail jobs.
-- [ ] Add queued notification objects, per-channel queue options, events, localization, and additional channels.
+- [x] Add synchronous notification lifecycle events and queued-send cancellation.
+- [ ] Add queued notification objects, delivery events for queued notifications,
+      per-channel queue options, localization, and additional channels.
 
 ### Filesystems and uploads
 

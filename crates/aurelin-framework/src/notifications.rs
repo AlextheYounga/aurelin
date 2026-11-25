@@ -1,8 +1,9 @@
 //! Recipient-aware notification dispatch with an explicit mail channel.
 
-use std::error::Error;
+use std::{any::type_name, error::Error, fmt};
 
-use crate::mail::{MailError, MailMessage, Mailer};
+use crate::events::{DispatchError as EventError, DispatchOutcome, EventDispatcher};
+use crate::mail::{MailError, MailMessage, Mailer, SendOutcome};
 use crate::queue::TaskSink;
 use apalis_sqlite::SqliteStorage;
 
@@ -15,6 +16,24 @@ pub enum Channel {
     /// Deliver using the configured mailer.
     Mail,
 }
+
+/// Non-content metadata for a notification channel delivery.
+#[derive(Clone, Debug)]
+pub struct NotificationMetadata {
+    /// The Rust notification type selected by the application.
+    pub notification_type: &'static str,
+    /// The selected channel.
+    pub channel: Channel,
+    /// The destination address; treat it as personal data.
+    pub recipient: String,
+}
+
+/// Before a prepared notification is sent or enqueued. Stop cancels the channel.
+pub struct NotificationSending(pub NotificationMetadata);
+/// A synchronous notification was accepted by its mail transport.
+pub struct NotificationSent(pub NotificationMetadata);
+/// A synchronous notification's mail delivery failed.
+pub struct NotificationFailed(pub NotificationMetadata);
 
 /// Application-owned notification content and channel selection.
 pub trait Notification<Recipient> {
@@ -51,15 +70,28 @@ impl<N> MailRecipient<N> for AnonymousRecipient {
 }
 
 /// Dispatches notifications through explicitly supplied channel dependencies.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct NotificationDispatcher {
     mailer: Mailer,
+    events: Option<EventDispatcher>,
+}
+
+impl fmt::Debug for NotificationDispatcher {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NotificationDispatcher").finish_non_exhaustive()
+    }
 }
 
 impl NotificationDispatcher {
     /// Create a dispatcher using the given mailer.
     pub fn new(mailer: Mailer) -> Self {
-        Self { mailer }
+        Self { mailer, events: None }
+    }
+
+    /// Configure notification lifecycle listeners explicitly.
+    pub fn with_events(mut self, events: EventDispatcher) -> Self {
+        self.events = Some(events);
+        self
     }
 
     /// Deliver selected channels in order. An empty selection does nothing.
@@ -72,8 +104,26 @@ impl NotificationDispatcher {
         for channel in channels {
             match channel {
                 Channel::Mail => {
-                    if let Some(message) = mail_message(recipient, notification)? {
-                        self.mailer.send(message).await?;
+                    if let Some((message, address)) = mail_message(recipient, notification)? {
+                        let metadata =
+                            NotificationMetadata { notification_type: type_name::<N>(), channel, recipient: address };
+                        if !self.sending(&metadata).await? {
+                            continue;
+                        }
+                        match self.mailer.send_with_outcome(message).await {
+                            Ok(SendOutcome::Sent) => {
+                                if let Some(events) = &self.events {
+                                    events.dispatch(NotificationSent(metadata)).await?;
+                                }
+                            }
+                            Ok(SendOutcome::Cancelled) => {}
+                            Err(error) => {
+                                if let Some(events) = &self.events {
+                                    events.dispatch(NotificationFailed(metadata)).await?;
+                                }
+                                return Err(error.into());
+                            }
+                        }
                     }
                 }
             }
@@ -98,7 +148,12 @@ impl NotificationDispatcher {
         for channel in notification.via(recipient).map_err(DispatchError::Selection)? {
             match channel {
                 Channel::Mail => {
-                    if let Some(message) = mail_message(recipient, notification)? {
+                    if let Some((message, address)) = mail_message(recipient, notification)? {
+                        let metadata =
+                            NotificationMetadata { notification_type: type_name::<N>(), channel, recipient: address };
+                        if !self.sending(&metadata).await? {
+                            continue;
+                        }
                         queue.push(message).await.map_err(|error| DispatchError::Queue(Box::new(error)))?;
                     }
                 }
@@ -106,9 +161,18 @@ impl NotificationDispatcher {
         }
         Ok(())
     }
+
+    async fn sending(&self, metadata: &NotificationMetadata) -> Result<bool, DispatchError> {
+        match &self.events {
+            Some(events) => {
+                Ok(events.dispatch(NotificationSending(metadata.clone())).await? != DispatchOutcome::Stopped)
+            }
+            None => Ok(true),
+        }
+    }
 }
 
-fn mail_message<N, R>(recipient: &R, notification: &N) -> Result<Option<MailMessage>, DispatchError>
+fn mail_message<N, R>(recipient: &R, notification: &N) -> Result<Option<(MailMessage, String)>, DispatchError>
 where
     N: Notification<R>,
     R: MailRecipient<N>,
@@ -117,7 +181,7 @@ where
     let Some(address) = recipient.route_mail(notification).map_err(DispatchError::Routing)? else {
         return Ok(None);
     };
-    Ok(Some(message.routed_to(&address)?))
+    Ok(Some((message.routed_to(&address)?, address)))
 }
 
 /// Failure to select, compose, route, or deliver a notification.
@@ -138,4 +202,7 @@ pub enum DispatchError {
     /// The rendered notification could not be enqueued.
     #[error("notification queue dispatch failed")]
     Queue(#[source] Box<dyn Error + Send + Sync>),
+    /// A lifecycle listener failed.
+    #[error(transparent)]
+    Event(#[from] EventError),
 }

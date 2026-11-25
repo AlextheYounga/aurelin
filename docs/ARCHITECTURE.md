@@ -502,12 +502,20 @@ the message for each supplied recipient, then pushes the existing `MailMessage`
 job to an explicitly supplied SQLite queue. The caller registers the mail worker.
 Recipient models and arbitrary application notification objects are not
 serialized or restored. Queue failures are returned; earlier queued messages
-are not rolled back. Per-channel queue connections, queues and delays,
-notification events, notification identifiers, locale selection,
+are not rolled back. An explicitly configured notification dispatcher emits
+`NotificationSending` after composition and routing, before sending or enqueueing;
+stopping it cancels the channel. Synchronous accepted delivery emits
+`NotificationSent`, and a synchronous mail error emits `NotificationFailed`.
+Preparation and enqueue errors do not emit a failure event. Queued rendered mail
+does not emit notification sent or failed events: its worker only has a mail job,
+not notification identity. Mail lifecycle events remain separate. Event metadata
+contains the notification type, channel, and destination address, not rendered
+content; addresses are personal data. Listener errors propagate, including after
+delivery, so retries can duplicate mail.
+
+Per-channel queue connections, queues and delays, notification identifiers, locale selection,
 Laravel's greeting/line/action renderer, Markdown/Blade mail, attachments,
-headers, and all other notification channels remain deferred. Notification
-events need a compatible event cancellation/response seam before being added;
-the existing event dispatcher is not replaced. Laravel `Mailable` workflows
+headers, and all other notification channels remain deferred. Laravel `Mailable` workflows
 are not claimed: applications can compose rendered general mail directly.
 
 ### Application console
