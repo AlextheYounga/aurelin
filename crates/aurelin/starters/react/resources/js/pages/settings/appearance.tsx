@@ -1,9 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { type Appearance, storedAppearance, updateAppearance } from '../../appearance';
 
 export default function AppearanceSettings() {
-    const [appearance, setAppearance] = useState<Appearance>(storedAppearance);
+    const [appearance, setAppearance] = useState<Appearance>('system');
+    useEffect(() => setAppearance(storedAppearance()), []);
     const update = (value: Appearance) => {
         setAppearance(value);
         updateAppearance(value);

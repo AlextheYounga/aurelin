@@ -77,8 +77,14 @@ router.
 
 This is not a claim of complete protocol parity. The selected adapter documents
 SSR and asynchronous prop resolvers as unsupported, and validation error bags
-as partial. Those gaps must be addressed or reassessed when their associated
-starter behavior is implemented. The official `inertiajs/inertia-laravel-rust`
+as partial. `inertia_rs` 0.4 calls the HTML document callback synchronously;
+Aurelin marks that response with its script-safe page context and awaits the
+renderer in Axum middleware. The dependency still decides HTML versus JSON and
+handles version conflicts. Generated React and Vue applications provide official
+Inertia Node renderer entries and hydration-capable browser entries. The Node
+renderer runs separately and receives only page JSON. Renderer failures fall
+back to the script-safe client document unless strict mode is enabled.
+The official `inertiajs/inertia-laravel-rust`
 port was also inspected at its 2026-11-18 `main` branch: it is alpha,
 unpublished to crates.io, and requires Rust 1.99, so it is not a compatible v1
 dependency for the workspace's current Rust 1.97 toolchain.
@@ -159,6 +165,12 @@ password-confirmation, profile, account-deletion, appearance, and a unified
 security screen for password, two-factor, and passkey management. SeaORM 1.1 provides application
 data access, SeaQuery-backed `sea-orm-migration` owns the SQLite schema, and
 SQLx remains SeaORM's driver and the Tower session-store infrastructure.
+Authenticated startup checks for pending migrations without applying them,
+including for in-memory SQLite; migrations are an explicit command or test setup.
+Authenticated applications own the example post entity, migration, seeded fake
+factory, and seeder registration; the console explicitly runs that registration
+and requires `--force` in production. The base registration is empty. These are
+application examples, not a reusable ORM or factory facade.
 `axum-valid` integrates `validator` with Axum request extraction. `axum-login`
 0.18 provides authenticated sessions and session-ID rotation, and
 `axum-tower-sessions-csrf` 0.1.1 validates state-changing requests.

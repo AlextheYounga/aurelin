@@ -18,8 +18,8 @@ This document establishes direction. It does not select crates, define a feature
 - **Frontend choices:** Vue or React using Inertia and Vite, or Rust/WASM using
   Leptos SSR and hydration with `cargo-leptos`. Aurelin will not provide Svelte
   or Livewire starters; those frontend stacks are explicitly out of scope.
-- **Inertia SSR:** Supported in a later milestone, not required for the initial
-  starter release.
+- **Inertia SSR:** React and Vue starters support an optional separately managed
+  Node.js renderer.
 - **Templating:** No Blade equivalent.
 - **Authentication:** Working boilerplate equivalent to Laravel 13's built-in authentication starter experience for Vue and React.
 - **Starter variants:** WorkOS authentication and team support are explicitly

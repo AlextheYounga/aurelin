@@ -2,6 +2,7 @@ use sea_orm_migration::prelude::*;
 
 mod m20261118_000001_create_auth_tables;
 mod m20261123_000001_create_queue_tables;
+mod m20261125_000001_create_posts;
 
 pub struct Migrator;
 
@@ -11,6 +12,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20261118_000001_create_auth_tables::Migration),
             Box::new(m20261123_000001_create_queue_tables::Migration),
+            Box::new(m20261125_000001_create_posts::Migration),
         ]
     }
 }

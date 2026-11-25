@@ -15,6 +15,7 @@ pub mod jobs;
 mod migrations;
 pub mod routes;
 pub mod schedule;
+pub mod seed;
 
 pub async fn run() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt()

@@ -29,6 +29,41 @@ while Cargo compiles the release executable:
 cargo build --release
 ```
 
+### Inertia SSR
+
+SSR requires Node.js 22 or newer in production as well as development. Install
+production npm dependencies on the renderer host: the SSR bundle imports the
+official Inertia and React or Vue packages at runtime.
+
+```sh
+npm ci
+npm run build:all
+npm run start:ssr
+```
+
+Run the renderer as a separately supervised process alongside the Rust server;
+the Rust request path never starts Node. It listens on `127.0.0.1:13714` by
+default. With `curl` installed, `npm run health:ssr` checks readiness and `npm run stop:ssr` requests
+shutdown. Restrict network access to this service: the official renderer also
+exposes a shutdown endpoint. For deployments, build both bundles from the same
+revision, restart the renderer and Rust process together, check health, and
+roll both back together if verification fails. Ensure the SSR bundle and its
+production `node_modules` are deployed to the renderer process.
+
+For local development, run `npm run build:ssr`, start `npm run start:ssr` in
+another terminal, then use `cargo aurelin dev`; rebuild and restart the renderer
+after frontend changes. Vite serves the browser assets separately.
+
+The backend integration is configured with
+`INERTIA_SSR_ENABLED` (default `false`), `INERTIA_SSR_URL` (default
+`http://127.0.0.1:13714/render`), `INERTIA_SSR_TIMEOUT_MS` (default `2000`),
+and `INERTIA_SSR_STRICT` (default `false`). The URL must point to a trusted,
+independently managed Inertia renderer; the backend sends page props to it.
+Rendering errors are logged and fall back to client rendering unless strict
+mode is enabled. Set `INERTIA_SSR_ENABLED=true` when the renderer is available.
+For the real Rust-to-Node integration test, run `npm run build:ssr` followed by
+`cargo test --test real_inertia_ssr -- --ignored`; it requires a free port 13714.
+
 Routes live in `src/routes/`, configuration in `src/config/`, application
 composition in `src/bootstrap.rs`, database migrations in
 `database/migrations/`, and pages in `resources/js/pages`. SeaORM and SeaQuery
