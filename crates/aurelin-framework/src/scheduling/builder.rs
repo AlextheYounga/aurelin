@@ -20,6 +20,9 @@ pub enum ConfigurationError {
     /// Protected tasks require a cache and a positive whole-second TTL.
     #[error("overlap prevention for {0:?} requires a cache and a positive whole-second lifetime")]
     InvalidOverlap(String),
+    /// Single-server election requires a shared cache.
+    #[error("single-server election for {0:?} requires a cache")]
+    MissingElectionCache(String),
 }
 
 /// Configures one application-owned callback.
@@ -29,6 +32,7 @@ pub struct TaskBuilder {
     timezone: String,
     callback: Arc<Callback>,
     overlap: Option<Duration>,
+    one_server: bool,
 }
 
 impl TaskBuilder {
@@ -43,7 +47,14 @@ impl TaskBuilder {
             let future = callback();
             Box::pin(async move { future.await.map_err(|error| Box::new(error) as BoxError) }) as TaskFuture
         });
-        Self { name: name.into(), expression: expression.into(), timezone: "UTC".into(), callback, overlap: None }
+        Self {
+            name: name.into(),
+            expression: expression.into(),
+            timezone: "UTC".into(),
+            callback,
+            overlap: None,
+            one_server: false,
+        }
     }
 
     /// Evaluate this task in an IANA timezone instead of UTC.
@@ -61,6 +72,12 @@ impl TaskBuilder {
     /// Skip overlapping executions, using a positive whole-second lock lifetime.
     pub fn overlap_lifetime(mut self, lifetime: Duration) -> Self {
         self.overlap = Some(lifetime);
+        self
+    }
+
+    /// Elect one scheduler for each occurrence using the configured shared cache.
+    pub fn on_one_server(mut self) -> Self {
+        self.one_server = true;
         self
     }
 }
@@ -107,7 +124,17 @@ impl ScheduleBuilder {
                 Some(_) => return Err(ConfigurationError::InvalidOverlap(task.name)),
                 None => None,
             };
-            tasks.push(Task { name: task.name, expression, timezone, callback: task.callback, overlap_seconds });
+            if task.one_server && self.cache.is_none() {
+                return Err(ConfigurationError::MissingElectionCache(task.name));
+            }
+            tasks.push(Task {
+                name: task.name,
+                expression,
+                timezone,
+                callback: task.callback,
+                overlap_seconds,
+                one_server: task.one_server,
+            });
         }
         Ok(Schedule { inner: Arc::new(ScheduleInner { tasks, cache: self.cache }) })
     }

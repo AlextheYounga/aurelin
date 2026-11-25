@@ -44,6 +44,8 @@ pub enum TaskOutcome {
     Succeeded,
     /// Another execution held the overlap lock.
     SkippedOverlap,
+    /// Another scheduler won the election for this occurrence.
+    SkippedElection,
     /// The callback or its lock operation failed.
     Failed(TaskFailure),
 }
@@ -51,6 +53,9 @@ pub enum TaskOutcome {
 /// Failure at a task or cache-lock boundary.
 #[derive(Debug, thiserror::Error)]
 pub enum TaskFailure {
+    /// The cache failed while electing a scheduler.
+    #[error("could not acquire occurrence election lock: {0}")]
+    Election(#[source] CacheError),
     /// The lock could not be acquired because the cache failed.
     #[error("could not acquire overlap lock: {0}")]
     Acquire(#[source] CacheError),

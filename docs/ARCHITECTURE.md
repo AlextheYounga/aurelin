@@ -237,8 +237,6 @@ than treating this as a blanket complete-starter claim.
 
 The targeted comparison leaves these explicit authentication boundaries:
 
-- authentication events remain deferred: the existing event dispatcher is not
-  yet wired into the authentication workflows;
 - all default authentication features are currently generated together;
   Laravel's feature-selective starter generation is pending a product decision;
 - Aurelin currently targets the official Inertia starter workflow, not
@@ -430,8 +428,8 @@ separately and its eventual failure cannot roll back the original dispatch.
 Applications register a worker and handler for each job type. Queue payloads
 may contain sensitive data and must be protected, including failed jobs.
 
-Authentication events remain an unwired consumer of this foundation. Health and
-gate evaluation events are described in their respective sections.
+Authentication, health, and gate evaluation events are described in their
+respective sections.
 
 ### Notifications and mail
 
@@ -570,9 +568,10 @@ pub fn schedule() -> Result<Schedule, ConfigurationError> {
 }
 ```
 
-To prevent overlaps, supply the application's configured `Cache` with
+To coordinate tasks, supply the application's configured `Cache` with
 `schedule.cache(cache)` and add `.without_overlapping()` or
-`.overlap_lifetime(duration)` to the task. Capture any task dependencies
+`.overlap_lifetime(duration)` to prevent overlaps, or `.on_one_server()` to
+elect one scheduler per occurrence. Capture any task dependencies
 explicitly in the callback. Choose a shared Redis store when separate scheduler
 processes must coordinate.
 
@@ -582,12 +581,12 @@ default. Five-field cron expressions are parsed using the `cron` crate. Numeric
 weekdays, weekday step expressions, and expressions restricting both day of
 month and weekday are rejected because that parser's semantics differ from
 Laravel's. Other unsupported parser syntax is rejected rather than emulated.
-DST transitions may skip or repeat local times. Every invocation is independent:
-invoking twice in a minute may execute twice. There is no missed-run replay.
+DST transitions may skip or repeat local times. Tasks without election may
+execute twice when invoked twice in a minute. There is no missed-run replay.
 
 Due callbacks execute sequentially in registration order. Errors are recorded
 with task identity and do not prevent later tasks from running. The structured
-report distinguishes success, overlap skips, and callback or lock errors; the
+report distinguishes success, overlap and election skips, and callback or lock errors; the
 console reports failures and exits unsuccessfully after processing all due tasks.
 
 Overlap prevention requires a unique nonempty task name, an explicitly supplied
@@ -602,11 +601,20 @@ failure may leave the lock until expiry. A process-local cache only coordinates
 clones sharing that cache in one process; separate scheduler processes or
 servers need the same Redis cache and prefix.
 
-This is not full Laravel scheduler parity. `onOneServer` (per-occurrence
-election), command and queued-job scheduling adapters, `schedule:work`,
+Single-server election uses a separate owner-token lock keyed by task name and
+the UTC occurrence minute. The lock expires after one hour and is deliberately
+not released after the callback, even on failure. This elects at most one runner
+while the lock survives; eviction, cache loss, or replay after expiry can permit
+another run. It is not exactly-once execution. It can be combined with overlap
+prevention, which uses a separate lock. Redis coordination requires a shared
+store and prefix; distributed behavior still needs live Redis qualification.
+
+This is not full Laravel scheduler parity. Command and queued-job scheduling adapters, `schedule:work`,
 sub-minute tasks, background execution, maintenance and environment checks,
 filters, hooks, scheduler events, output capture, pause and interrupt,
 groups, frequency shortcuts, and scheduler inspection commands are deferred.
+`schedule:work` needs a clock-driven long-running loop and clean shutdown;
+until those are designed and tested, use a system scheduler for `schedule:run`.
 Callbacks can explicitly use other public framework APIs themselves.
 
 ### Queue foundation
