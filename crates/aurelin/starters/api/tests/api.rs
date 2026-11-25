@@ -96,6 +96,8 @@ async fn issued_token_authenticates_bearer_only_and_can_be_revoked() -> Result<(
     let digest: String = row.try_get("", "digest")?;
     assert_ne!(digest, token);
     assert!(!token.contains(&digest));
+    let (_, secret) = token.split_once('|').ok_or("malformed issued token")?;
+    assert_eq!(digest, aurelin_framework::auth::digest_token(secret));
     let authenticated = app
         .clone()
         .oneshot(
