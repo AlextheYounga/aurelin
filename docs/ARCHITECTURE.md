@@ -64,9 +64,16 @@ produce a failing process status. The starter includes:
   is requested;
 - Axum's native 404 and method-not-allowed behavior.
 
-The health route currently establishes only the default healthy response. Aurelin
-does not yet have Laravel's event dispatcher, so it cannot yet reproduce the
-`DiagnosingHealth` hook or its failure path.
+The framework health handler dispatches `DiagnosingHealth` through the supplied
+event dispatcher. A failed listener returns HTTP 500 and a `down` JSON status,
+without exposing its error to the client. Generated routes install an empty
+dispatcher by default; applications register diagnostic listeners when composing
+the route. The handler does not implement Laravel's debug-mode exception behavior
+or health page rendering.
+The reference is Laravel Framework 13.x commit
+`321caf77d6c037577434e177c3bf280abb2b3513`, specifically
+`src/Illuminate/Foundation/Http/HealthCheck.php` and
+`src/Illuminate/Foundation/Events/DiagnosingHealth.php`.
 
 ### Inertia protocol
 
@@ -192,6 +199,21 @@ Successful credential validation also replaces bcrypt hashes whose cost no
 longer matches the application's configured default before the session or
 two-factor challenge continues.
 
+The public reset-link response deliberately differs from Fortify's default:
+unknown users and throttled requests receive the same success feedback as a
+sent link. Token throttling still applies. Token creation and notification are
+timeboxed to the authentication minimum; work exceeding that minimum can still
+affect response time. Backend and delivery failures are logged without account
+details and do not change the public response.
+
+Applications may explicitly expose the framework event dispatcher through
+`FortifyBackend::authentication_events`. Fortify emits observational `Login`,
+`Failed`, `Lockout`, `Registered`, `PasswordReset`, `Verified`, and `Logout`
+events for the implemented Axum workflows. Payloads omit credentials and
+request/session data. Listener errors and stop signals cannot change the auth
+result; as with the framework dispatcher, they stop later listeners for that
+event. A listener failure is logged without its potentially sensitive details.
+
 Login, registration, and password-reset routes enforce Fortify's guest-only
 boundary for both views and submissions. Password confirmation uses Fortify's
 `/user/confirm-password` route, verifies the current password, and records the
@@ -227,8 +249,6 @@ than treating this as a blanket complete-starter claim.
 
 The targeted comparison leaves these explicit authentication boundaries:
 
-- authentication events remain deferred until Aurelin has a general event
-  dispatcher, as tracked in the roadmap;
 - all default authentication features are currently generated together;
   Laravel's feature-selective starter generation is pending a product decision;
 - Aurelin currently targets the official Inertia starter workflow, not
@@ -267,10 +287,16 @@ route handler and reads the user installed by `AuthManagerLayer`. Resource
 handlers load their models through Axum and SeaORM before calling
 `gate.for_user(...).authorize(...)`; Aurelin does not introduce an implicit
 Eloquent-style model-binding layer. Inline `allow_if` and `deny_if` checks bypass
-registered hooks as they do in Laravel. Gate evaluation events remain deferred
-until Aurelin's general event dispatcher exists, policy generation belongs to
-the later CLI-tooling milestone, and authorization props for Inertia remain an
-application presentation decision as Laravel documents.
+registered hooks as they do in Laravel. A gate can explicitly use the shared event
+dispatcher: `GateEvaluated<User>` is dispatched after the after hooks, with the
+typed context, user, ability, and unresolved-or-resolved result. Listeners cannot
+replace the authorization result; a listener error fails the check. Policy
+generation belongs to the later CLI-tooling milestone, and authorization props
+for Inertia remain an application presentation decision as Laravel documents.
+The event boundary was compared with Laravel Framework 13.x commit
+`321caf77d6c037577434e177c3bf280abb2b3513`, including
+`src/Illuminate/Auth/Access/Gate.php`, `Events/GateEvaluated.php`, and
+`tests/Auth/AuthAccessGateTest.php`.
 
 ### Cache foundation
 
@@ -407,13 +433,15 @@ ordering and failure semantics. Laravel's response arrays and `until` method
 are not included in this initial side-effect dispatcher because a typed Rust
 equivalent needs an actual response-producing consumer to establish its event
 response type. Wildcards, subscribers, discovery, deferred and after-commit
-events, broadcasting, and queued listeners also remain deferred. A future
-queued-listener adapter can register through the existing async listener seam
-and use Apalis without coupling this dispatcher to the queue today.
+events and broadcasting remain deferred. `listen_queued` maps an event to an
+explicit application-owned serializable job and pushes it to an Apalis SQLite
+queue in listener order. Enqueue failure stops later listeners; the worker runs
+separately and its eventual failure cannot roll back the original dispatch.
+Applications register a worker and handler for each job type. Queue payloads
+may contain sensitive data and must be protected, including failed jobs.
 
-Authentication, authorization gate, and health diagnostic events remain
-follow-up consumers of this foundation; this branch does not add those
-integrations.
+Authentication, health, and gate evaluation events are described in their
+respective sections.
 
 ### Notifications and mail
 
@@ -451,11 +479,22 @@ logs must therefore be protected as sensitive data. SMTP credentials are not
 part of the message. Applications own content and any renderer functions; there
 is no template engine or automatic HTML escaping.
 
+An explicitly configured event dispatcher receives `MessageSending` after
+message validation and before transport, and `MessageSent` after successful
+delivery. Stopping `MessageSending` cancels delivery; listener errors are
+returned. `MessageFailed` is an Aurelin extension, emitted for message-build or
+transport failures, not for listener failures. If its listener fails, that
+listener error replaces the delivery error. A sent-listener failure is returned
+after delivery and retries can duplicate mail. Event payloads contain rendered
+content and recipient addresses, but not transport credentials; protect listeners
+and logs accordingly. Laravel Framework 13.x `Mail/Mailer.php` defines the
+sending and sent events; it does not define a general `MessageFailed` event.
+
 The message is a concrete serializable Apalis job. Applications may push it to
 `queue::sqlite::<MailMessage>` using the existing `TaskSink` and run an Apalis
 worker whose handler calls `mailer.send(message)`. The worker must be explicitly
-registered: the generated `queue:work` currently handles only the application's
-example job. The queued message stores rendered bodies and addresses in SQLite,
+registered: the generated `queue:work` registers workers for the application's
+example job, example listener job, and rendered mail. The queued message stores rendered bodies and addresses in SQLite,
 including failed-job payloads; protect queue storage accordingly. Addresses
 are revalidated on deserialization and credentials are never serialized.
 Retries may deliver duplicates if an SMTP server accepted a message before a
@@ -483,13 +522,25 @@ The example uses `queue::{self, BoxDynError, TaskSink, WorkerBuilder}` and
 application process, not as part of an HTTP request.
 
 Unlike Laravel's queued notifications, queued messages are rendered before
-enqueueing, and recipient models and arbitrary application notification objects
-are not serialized or restored. Per-channel queue connections, queues and
-delays, notification events, notification identifiers, locale selection,
+enqueueing. `NotificationDispatcher::queue` selects channels, renders and routes
+the message for each supplied recipient, then pushes the existing `MailMessage`
+job to an explicitly supplied SQLite queue. The caller registers the mail worker.
+Recipient models and arbitrary application notification objects are not
+serialized or restored. Queue failures are returned; earlier queued messages
+are not rolled back. An explicitly configured notification dispatcher emits
+`NotificationSending` after composition and routing, before sending or enqueueing;
+stopping it cancels the channel. Synchronous accepted delivery emits
+`NotificationSent`, and a synchronous mail error emits `NotificationFailed`.
+Preparation and enqueue errors do not emit a failure event. Queued rendered mail
+does not emit notification sent or failed events: its worker only has a mail job,
+not notification identity. Mail lifecycle events remain separate. Event metadata
+contains the notification type, channel, and destination address, not rendered
+content; addresses are personal data. Listener errors propagate, including after
+delivery, so retries can duplicate mail.
+
+Per-channel queue connections, queues and delays, notification identifiers, locale selection,
 Laravel's greeting/line/action renderer, Markdown/Blade mail, attachments,
-headers, and all other notification channels remain deferred. Notification
-events need a compatible event cancellation/response seam before being added;
-the existing event dispatcher is not replaced. Laravel `Mailable` workflows
+headers, and all other notification channels remain deferred. Laravel `Mailable` workflows
 are not claimed: applications can compose rendered general mail directly.
 
 ### Application console
@@ -529,9 +580,10 @@ pub fn schedule() -> Result<Schedule, ConfigurationError> {
 }
 ```
 
-To prevent overlaps, supply the application's configured `Cache` with
+To coordinate tasks, supply the application's configured `Cache` with
 `schedule.cache(cache)` and add `.without_overlapping()` or
-`.overlap_lifetime(duration)` to the task. Capture any task dependencies
+`.overlap_lifetime(duration)` to prevent overlaps, or `.on_one_server()` to
+elect one scheduler per occurrence. Capture any task dependencies
 explicitly in the callback. Choose a shared Redis store when separate scheduler
 processes must coordinate.
 
@@ -541,12 +593,12 @@ default. Five-field cron expressions are parsed using the `cron` crate. Numeric
 weekdays, weekday step expressions, and expressions restricting both day of
 month and weekday are rejected because that parser's semantics differ from
 Laravel's. Other unsupported parser syntax is rejected rather than emulated.
-DST transitions may skip or repeat local times. Every invocation is independent:
-invoking twice in a minute may execute twice. There is no missed-run replay.
+DST transitions may skip or repeat local times. Tasks without election may
+execute twice when invoked twice in a minute. There is no missed-run replay.
 
 Due callbacks execute sequentially in registration order. Errors are recorded
 with task identity and do not prevent later tasks from running. The structured
-report distinguishes success, overlap skips, and callback or lock errors; the
+report distinguishes success, overlap and election skips, and callback or lock errors; the
 console reports failures and exits unsuccessfully after processing all due tasks.
 
 Overlap prevention requires a unique nonempty task name, an explicitly supplied
@@ -561,11 +613,20 @@ failure may leave the lock until expiry. A process-local cache only coordinates
 clones sharing that cache in one process; separate scheduler processes or
 servers need the same Redis cache and prefix.
 
-This is not full Laravel scheduler parity. `onOneServer` (per-occurrence
-election), command and queued-job scheduling adapters, `schedule:work`,
+Single-server election uses a separate owner-token lock keyed by task name and
+the UTC occurrence minute. The lock expires after one hour and is deliberately
+not released after the callback, even on failure. This elects at most one runner
+while the lock survives; eviction, cache loss, or replay after expiry can permit
+another run. It is not exactly-once execution. It can be combined with overlap
+prevention, which uses a separate lock. Redis coordination requires a shared
+store and prefix; distributed behavior still needs live Redis qualification.
+
+This is not full Laravel scheduler parity. Command and queued-job scheduling adapters, `schedule:work`,
 sub-minute tasks, background execution, maintenance and environment checks,
 filters, hooks, scheduler events, output capture, pause and interrupt,
 groups, frequency shortcuts, and scheduler inspection commands are deferred.
+`schedule:work` needs a clock-driven long-running loop and clean shutdown;
+until those are designed and tested, use a system scheduler for `schedule:run`.
 Callbacks can explicitly use other public framework APIs themselves.
 
 ### Queue foundation
@@ -579,15 +640,23 @@ sink and worker types rather than inventing a second queue API.
 Generated applications own their serializable job types and handlers. The
 starter includes an example job, a dispatch function, and a `cargo aurelin
 queue:work` process using the same `DATABASE_URL` as the application. Generated
-application tests dispatch through SQLite and process the job through a real
-worker. Queue tables are application-owned migrations, so dispatch and workers
+application tests dispatch three concrete job types through SQLite and process
+them through the application's Apalis monitor, including shutdown. The worker
+uses the same mail environment configuration as the application. Queue tables
+are application-owned migrations, so dispatch and workers
 fail with migration guidance instead of creating schema during startup. Apalis
 persists attempts and terminal failures in its durable job rows; Aurelin exposes
 those rows through `queue:failed`, `queue:retry`, `queue:forget`, and
 `queue:flush`. This deliberately avoids duplicating each terminal job into a
 second Laravel-shaped `failed_jobs` table: retry resets the durable row before a
-worker claims it again. Per-job backoff, worker timeouts, additional queue
-drivers, batching, and chaining remain future parity work.
+worker claims it again. Apalis 1.1.1 exposes the `WorkerBuilderExt::timeout`
+Tower middleware and `RetryPolicy::with_backoff`, as well as task retry metadata.
+These middleware retries wait within the worker; the existing SQLite durable
+attempt/failure conventions have not been qualified with those middleware layers
+or across worker restarts. The SQLite `poll_with_backoff` API changes idle polling,
+not failed-job retry timing. Aurelin therefore does not yet expose or claim
+Laravel-style durable per-job timeout/backoff semantics. Additional queue drivers,
+batching, and chaining remain future work.
 
 ## Growth rule
 

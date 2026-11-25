@@ -15,13 +15,13 @@ pub(super) fn install_api_registration(path: &Path) -> Result<()> {
     let migrations = path.join("database/migrations/mod.rs");
     replace(
         &migrations,
-        "mod m20261123_000001_create_queue_tables;",
-        "mod m20261123_000001_create_queue_tables;\nmod m20261125_000001_create_personal_access_tokens;",
+        "mod m20261125_000001_create_posts;",
+        "mod m20261125_000001_create_posts;\nmod m20261125_000001_create_personal_access_tokens;",
     )?;
     replace(
         &migrations,
-        "Box::new(m20261123_000001_create_queue_tables::Migration),",
-        "Box::new(m20261123_000001_create_queue_tables::Migration),\n            Box::new(m20261125_000001_create_personal_access_tokens::Migration),",
+        "Box::new(m20261125_000001_create_posts::Migration),",
+        "Box::new(m20261125_000001_create_posts::Migration),\n            Box::new(m20261125_000001_create_personal_access_tokens::Migration),",
     )?;
     let bootstrap = path.join("src/bootstrap.rs");
     replace(

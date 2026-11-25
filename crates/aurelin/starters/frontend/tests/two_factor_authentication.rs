@@ -36,6 +36,7 @@ async fn confirmed_two_factor_setup_requires_a_code_or_single_use_recovery_code_
         ApplicationOptions {
             mailer: aurelin_framework::mail::Mailer::log(),
             authentication_timebox_duration,
+            authentication_events: None,
         },
     )
     .await?;

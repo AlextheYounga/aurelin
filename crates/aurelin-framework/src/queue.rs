@@ -4,7 +4,7 @@ use apalis_sqlite::{SqlitePool, SqliteStorage};
 use serde::Serialize;
 use sqlx::Row;
 
-pub use apalis::prelude::{BoxDynError, TaskBuilder, TaskSink, WorkerBuilder, WorkerContext};
+pub use apalis::prelude::{BoxDynError, Monitor, TaskBuilder, TaskSink, WorkerBuilder, WorkerContext};
 
 pub mod commands;
 

@@ -33,7 +33,7 @@ mod http;
 mod response;
 mod user_gate;
 
-pub use gate::{Gate, GateBuilder, GateError, Policy, PolicyRegistrar};
+pub use gate::{Gate, GateBuilder, GateError, GateEvaluated, Policy, PolicyRegistrar};
 pub use http::AuthorizeLayer;
 pub use response::{AuthorizationError, AuthorizationResponse, IntoAuthorizationResponse};
 pub use user_gate::UserGate;

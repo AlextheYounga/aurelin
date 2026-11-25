@@ -40,9 +40,15 @@ async fn application_and_fortify_html_use_ssr_but_inertia_visits_do_not()
     let frontend =
         Frontend::new().with_ssr(Ssr::new(SsrSettings::from_environment(&environment)?)?);
     let version = frontend.version();
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application(
         frontend,
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",

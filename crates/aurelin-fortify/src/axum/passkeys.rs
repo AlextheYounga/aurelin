@@ -20,6 +20,7 @@ use serde_json::{Value, json};
 use super::{
     AuthSession, FortifyBackend, FortifyFrontend, FortifyHttpError, PasskeyLoginOutcome, PasskeyRegistrationOutcome,
     PasskeyRegistrationRequest,
+    events::{self, Login},
     login_session::set_login_expiry,
     password_confirmation::{PASSWORD_CONFIRMATION_REDIRECT, PASSWORD_CONFIRMED_AT, password_is_confirmed},
 };
@@ -183,6 +184,7 @@ async fn login<B: FortifyBackend>(
     };
     auth.login(&user).await.map_err(FortifyHttpError::auth_session)?;
     set_login_expiry(&auth.session, remember);
+    events::observe(auth.backend.authentication_events(), Login { user_id: user.id(), remember }).await;
     Ok(limit.add_headers(Json(json!({ "redirect": "/dashboard" })).into_response()))
 }
 

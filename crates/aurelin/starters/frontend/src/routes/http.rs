@@ -1,11 +1,7 @@
 use aurelin_framework::{
-    axum::{
-        Json, Router,
-        extract::State,
-        http::{HeaderMap, StatusCode, header::ACCEPT},
-        response::{IntoResponse, Response},
-        routing::get,
-    },
+    axum::{Router, extract::State, response::Response, routing::get},
+    events::EventDispatcher,
+    health,
     inertia::{Inertia, axum::InertiaRequest},
 };
 use axum_tower_sessions_csrf::get_or_create_token;
@@ -33,7 +29,7 @@ struct AuthProps {
 pub fn routes() -> Router<Frontend> {
     Router::new()
         .route("/", get(welcome))
-        .route("/up", get(health))
+        .route("/up", health::route(EventDispatcher::builder().build()))
 }
 
 async fn welcome(
@@ -57,19 +53,4 @@ async fn welcome(
         ),
         move |context| frontend.document(context),
     )?)
-}
-
-async fn health(headers: HeaderMap) -> Response {
-    let expects_json = headers
-        .get(ACCEPT)
-        .and_then(|value| value.to_str().ok())
-        .is_some_and(|value| {
-            value
-                .split(',')
-                .any(|mime| mime.trim().starts_with("application/json"))
-        });
-    if expects_json {
-        return (StatusCode::OK, Json(serde_json::json!({ "status": "up" }))).into_response();
-    }
-    (StatusCode::OK, "Application up").into_response()
 }

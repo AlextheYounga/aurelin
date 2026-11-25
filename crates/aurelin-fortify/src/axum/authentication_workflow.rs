@@ -8,6 +8,7 @@ use crate::LoginRateLimiter;
 
 use super::{
     CreateUserOutcome, Credentials, FortifyBackend, FortifyHttpError, FortifyUser,
+    events::{self, Failed, Lockout, Login, Logout, Registered},
     login_session::{PENDING_REMEMBER_LOGIN, set_login_expiry},
 };
 
@@ -53,6 +54,7 @@ pub async fn attempt_login<B: FortifyBackend>(
     }
     let key = LoginRateLimiter::key(&attempt.email, attempt.ip_address);
     if let Some(retry_after) = auth.backend.login_retry_after(&key).await {
+        events::observe(auth.backend.authentication_events(), Lockout).await;
         return Ok(LoginOutcome::RateLimited { retry_after });
     }
     let timebox = Timebox::start(auth.backend.authentication_timebox_duration());
@@ -67,6 +69,7 @@ pub async fn attempt_login<B: FortifyBackend>(
             RateLimitOutcome::Allowed { remaining } => remaining,
             RateLimitOutcome::Limited { .. } => 0,
         };
+        events::observe(auth.backend.authentication_events(), Failed).await;
         return Ok(LoginOutcome::InvalidCredentials { remaining });
     };
     if user.two_factor_is_enabled() {
@@ -77,6 +80,8 @@ pub async fn attempt_login<B: FortifyBackend>(
     auth.backend.clear_failed_logins(&key).await;
     auth.login(&user).await.map_err(FortifyHttpError::auth_session)?;
     set_login_expiry(&auth.session, attempt.remember);
+    events::observe(auth.backend.authentication_events(), Login { user_id: user.id(), remember: attempt.remember })
+        .await;
     Ok(LoginOutcome::Authenticated)
 }
 
@@ -126,16 +131,19 @@ pub async fn attempt_registration<B: FortifyBackend>(
             return Ok(RegistrationOutcome::EmailAlreadyExists);
         }
     };
+    events::observe(auth.backend.authentication_events(), Registered { user_id: user.id() }).await;
     auth.backend.send_email_verification(&user).await.map_err(FortifyHttpError::backend)?;
     auth.login(&user).await.map_err(FortifyHttpError::auth_session)?;
+    events::observe(auth.backend.authentication_events(), Login { user_id: user.id(), remember: false }).await;
     tracing::info!(user_id = user.id(), "user registered");
     Ok(RegistrationOutcome::Created)
 }
 
 pub async fn logout<B: FortifyBackend>(auth: &mut axum_login::AuthSession<B>) -> Result<bool, FortifyHttpError> {
-    if auth.user.is_none() {
+    let Some(user_id) = auth.user.as_ref().map(|user| user.id()) else {
         return Ok(false);
-    }
+    };
     auth.logout().await.map_err(FortifyHttpError::auth_session)?;
+    events::observe(auth.backend.authentication_events(), Logout { user_id }).await;
     Ok(true)
 }

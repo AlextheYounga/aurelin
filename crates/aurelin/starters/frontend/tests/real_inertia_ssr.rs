@@ -61,9 +61,15 @@ async fn official_renderer_serves_html_and_shuts_down() -> Result<(), Box<dyn Er
     env.insert("INERTIA_SSR_STRICT".into(), "true".into());
     let frontend = Frontend::new().with_ssr(Ssr::new(SsrSettings::from_environment(&env)?)?);
     let version = frontend.version();
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application(
         frontend,
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",
@@ -112,7 +118,7 @@ async fn official_renderer_serves_html_and_shuts_down() -> Result<(), Box<dyn Er
     let frontend = Frontend::new().with_ssr(Ssr::new(SsrSettings::from_environment(&env)?)?);
     let app = application(
         frontend,
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",

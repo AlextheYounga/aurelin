@@ -240,6 +240,58 @@ async fn queued_mail_is_dispatched_and_delivered_by_a_real_apalis_worker() -> Re
     Ok(())
 }
 
+#[tokio::test]
+async fn queued_notification_renders_recipient_mail_and_worker_delivers_it() -> Result<(), Box<dyn Error>> {
+    use aurelin_framework::queue::{self, BoxDynError, WorkerBuilder, WorkerContext};
+    let database = tempfile::NamedTempFile::new()?;
+    let url = format!("sqlite://{}?mode=rwc", database.path().display());
+    let pool = apalis_sqlite::SqlitePool::connect(&url).await?;
+    apalis_sqlite::SqliteStorage::setup(&pool).await?;
+    pool.close().await;
+    let mut queue = queue::sqlite::<MailMessage>(&url).await?;
+    let notification = Invoice { selected: true, calls: Arc::new(AtomicUsize::new(0)) };
+    NotificationDispatcher::new(Mailer::log())
+        .queue(&AnonymousRecipient::mail("queued@example.com"), &notification, &mut queue)
+        .await?;
+    let (mailer, server) = smtp_server()?;
+    WorkerBuilder::new("notification-mail-worker")
+        .backend(queue)
+        .build(move |message: MailMessage, worker: WorkerContext| {
+            let mailer = mailer.clone();
+            async move {
+                mailer.send(message).await?;
+                worker.stop()?;
+                Ok::<(), BoxDynError>(())
+            }
+        })
+        .run()
+        .await?;
+    let (recipients, message) = server.join().map_err(|_| "server panicked")??;
+    assert_eq!(recipients.len(), 1);
+    assert!(recipients[0].contains("queued@example.com"));
+    assert!(message.contains("Invoice paid"));
+    assert!(!message.contains("wrong@example.com"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn queued_notification_reports_queue_failures() -> Result<(), Box<dyn Error>> {
+    use aurelin_framework::queue;
+    let database = tempfile::NamedTempFile::new()?;
+    let url = format!("sqlite://{}?mode=rwc", database.path().display());
+    let pool = apalis_sqlite::SqlitePool::connect(&url).await?;
+    apalis_sqlite::SqliteStorage::setup(&pool).await?;
+    pool.close().await;
+    let mut queue = queue::sqlite::<MailMessage>(&url).await?;
+    queue.pool().close().await;
+    let notification = Invoice { selected: true, calls: Arc::new(AtomicUsize::new(0)) };
+    let result = NotificationDispatcher::new(Mailer::log())
+        .queue(&AnonymousRecipient::mail("ada@example.com"), &notification, &mut queue)
+        .await;
+    assert!(matches!(result, Err(DispatchError::Queue(_))));
+    Ok(())
+}
+
 #[test]
 fn serialized_mail_revalidates_addresses_when_read_from_the_queue() -> Result<(), Box<dyn Error>> {
     let message = MailMessage::new("subject", "body").to("ada@example.com")?;

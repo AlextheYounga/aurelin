@@ -82,7 +82,10 @@ pub async fn run(environment: HashMap<String, String>) -> Result<(), Box<dyn Err
             }
             crate::seed::run(database_url(&environment)).await
         }
-        Some(Command::QueueWork) => crate::jobs::work(database_url(&environment)).await,
+        Some(Command::QueueWork) => {
+            let mailer = aurelin_framework::mail::Mailer::from_environment(&environment)?;
+            crate::jobs::work(database_url(&environment), mailer).await
+        }
         Some(Command::ScheduleRun) => {
             aurelin_framework::scheduling::commands::run(&crate::schedule::schedule()?).await?;
             Ok(())

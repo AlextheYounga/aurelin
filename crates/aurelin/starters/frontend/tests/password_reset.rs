@@ -6,7 +6,11 @@ use std::{
     net::SocketAddr,
     path::Path,
     process,
-    time::{SystemTime, UNIX_EPOCH},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use aurelin_framework::{
@@ -16,8 +20,10 @@ use aurelin_framework::{
         extract::ConnectInfo,
         http::{Method, Request, Response, StatusCode, header},
     },
+    events::EventDispatcher,
+    mail::{Mailer, MessageSent},
 };
-use __AURELIN_CRATE__::{bootstrap::application, database, frontend::Frontend};
+use __AURELIN_CRATE__::{bootstrap::application_with_mailer, database, frontend::Frontend};
 use sea_orm::{ConnectionTrait, Database, DatabaseBackend, Statement};
 use tower::ServiceExt;
 
@@ -30,13 +36,24 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
     ));
     let database_url = format!("sqlite://{}?mode=rwc", database_path.display());
     database::migrate(&database_url).await?;
-    let app = application(
+    let sent = Arc::new(AtomicUsize::new(0));
+    let mut events = EventDispatcher::builder();
+    let observed = Arc::clone(&sent);
+    events.listen(move |_: Arc<MessageSent>| {
+        let observed = Arc::clone(&observed);
+        async move {
+            observed.fetch_add(1, Ordering::SeqCst);
+            Ok::<(), std::convert::Infallible>(())
+        }
+    });
+    let app = application_with_mailer(
         Frontend::new(),
         &database_url,
         false,
         b"test-key",
         "local",
         "http://localhost:8000",
+        Mailer::log().with_events(events.build()),
     )
     .await?;
 
@@ -88,6 +105,8 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
         .await?;
     let reset_cookie = session_cookie(&forgot_page)?;
     let reset_csrf = csrf_token(forgot_page).await?;
+    let sent_before_reset = sent.load(Ordering::SeqCst);
+    let started = Instant::now();
     let unknown = app
         .clone()
         .oneshot(request(
@@ -98,22 +117,35 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
             Some(r#"{"email":"unknown@example.com"}"#),
         )?)
         .await?;
+    // The timebox is a minimum; slow transports or loaded CI workers can take longer.
+    assert!(started.elapsed() >= Duration::from_millis(190));
     assert_eq!(unknown.status(), StatusCode::SEE_OTHER);
-    assert!(
-        response_body(
-            app.clone()
-                .oneshot(request(
-                    Method::GET,
-                    "/forgot-password",
-                    Some(&reset_cookie),
-                    None,
-                    None,
-                )?)
-                .await?,
-        )
+    assert_eq!(sent.load(Ordering::SeqCst), sent_before_reset);
+    let unknown_feedback = response_body(
+        app.clone()
+            .oneshot(request(
+                Method::GET,
+                "/forgot-password",
+                Some(&reset_cookie),
+                None,
+                None,
+            )?)
+            .await?,
+    )
+    .await?;
+    assert!(unknown_feedback.contains("We have emailed your password reset link."));
+    let database = Database::connect(&database_url).await?;
+    let unknown_records = database
+        .query_one(Statement::from_sql_and_values(
+            DatabaseBackend::Sqlite,
+            "SELECT COUNT(*) AS count FROM password_reset_tokens WHERE email = ?",
+            ["unknown@example.com".into()],
+        ))
         .await?
-        .contains("We can't find a user")
-    );
+        .ok_or("missing count")?
+        .try_get::<i64>("", "count")?;
+    assert_eq!(unknown_records, 0);
+    database.close().await?;
     let requested = app
         .clone()
         .oneshot(request(
@@ -125,6 +157,36 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
         )?)
         .await?;
     assert_eq!(requested.status(), StatusCode::SEE_OTHER);
+    assert_eq!(sent.load(Ordering::SeqCst), sent_before_reset + 1);
+    assert_eq!(
+        unknown.headers()[header::LOCATION],
+        requested.headers()[header::LOCATION]
+    );
+    let known_feedback = response_body(
+        app.clone()
+            .oneshot(request(
+                Method::GET,
+                "/forgot-password",
+                Some(&reset_cookie),
+                None,
+                None,
+            )?)
+            .await?,
+    )
+    .await?;
+    assert_eq!(unknown_feedback, known_feedback);
+    let database = Database::connect(&database_url).await?;
+    let known_records = database
+        .query_one(Statement::from_sql_and_values(
+            DatabaseBackend::Sqlite,
+            "SELECT COUNT(*) AS count FROM password_reset_tokens WHERE email = ?",
+            ["ada@example.com".into()],
+        ))
+        .await?
+        .ok_or("missing count")?
+        .try_get::<i64>("", "count")?;
+    assert_eq!(known_records, 1);
+    database.close().await?;
     let throttled = app
         .clone()
         .oneshot(request(
@@ -136,7 +198,16 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
         )?)
         .await?;
     assert_eq!(throttled.status(), StatusCode::SEE_OTHER);
-    assert!(
+    assert_eq!(
+        unknown.headers()[header::LOCATION],
+        throttled.headers()[header::LOCATION]
+    );
+    assert_eq!(
+        response_body(unknown).await?,
+        response_body(requested).await?
+    );
+    assert_eq!(
+        unknown_feedback,
         response_body(
             app.clone()
                 .oneshot(request(
@@ -149,7 +220,6 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
                 .await?,
         )
         .await?
-        .contains("Please wait before retrying")
     );
 
     let token = "known-reset-token";

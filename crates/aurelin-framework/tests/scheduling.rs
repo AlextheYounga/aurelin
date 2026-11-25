@@ -53,6 +53,46 @@ fn invalid_schedules_are_rejected_before_execution() {
     let mut builder = Schedule::builder();
     builder.task(no_op("protected", "* * * * *").without_overlapping());
     assert!(builder.build().is_err());
+    let mut builder = Schedule::builder();
+    builder.task(no_op("elected", "* * * * *").on_one_server());
+    assert!(builder.build().is_err());
+}
+
+#[tokio::test]
+async fn independent_schedulers_elect_one_runner_per_occurrence_even_after_failure() -> TestResult {
+    let store = LocalStore::new(1000);
+    let count = Arc::new(AtomicUsize::new(0));
+    let make_schedule = || -> Result<Schedule, Box<dyn Error>> {
+        let mut builder = Schedule::builder();
+        let count = Arc::clone(&count);
+        builder.cache(Cache::new(store.clone(), "election:"));
+        builder.task(
+            TaskBuilder::new("elected", "* * * * *", move || {
+                let count = Arc::clone(&count);
+                async move {
+                    count.fetch_add(1, Ordering::SeqCst);
+                    Err::<(), _>(io::Error::other("callback failed"))
+                }
+            })
+            .on_one_server(),
+        );
+        Ok(builder.build()?)
+    };
+    let first = make_schedule()?;
+    let second = make_schedule()?;
+    let (a, b) = tokio::join!(first.run_due_at(instant()), second.run_due_at(instant()));
+    assert_eq!(count.load(Ordering::SeqCst), 1);
+    assert!(matches!(
+        (a.tasks()[0].outcome(), b.tasks()[0].outcome()),
+        (TaskOutcome::Failed(_), TaskOutcome::SkippedElection) | (TaskOutcome::SkippedElection, TaskOutcome::Failed(_))
+    ));
+    assert!(matches!(second.run_due_at(instant()).await.tasks()[0].outcome(), TaskOutcome::SkippedElection));
+    assert!(matches!(
+        second.run_due_at(instant() + chrono::Duration::minutes(1)).await.tasks()[0].outcome(),
+        TaskOutcome::Failed(_)
+    ));
+    assert_eq!(count.load(Ordering::SeqCst), 2);
+    Ok(())
 }
 
 #[tokio::test]

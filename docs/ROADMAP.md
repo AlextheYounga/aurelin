@@ -109,8 +109,7 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [x] Shut down gracefully after Ctrl+C.
 - [x] Test generated applications through their compiled process and HTTP
       boundary.
-- [ ] Add Laravel's health diagnostic event hook after an event dispatcher is
-      available.
+- [x] Wire a health diagnostic event hook and failure response to the event dispatcher.
 - [ ] Add consistent Laravel-style HTTP error rendering.
 
 ### Personal access token API
@@ -253,8 +252,7 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [x] Perform a final targeted comparison of routes, props, redirects,
       validation responses, and security invariants against the pinned Laravel
       13 starter reference.
-- [ ] Map Laravel authentication events after Aurelin has an approved general
-      event-dispatcher boundary.
+- [ ] Map Laravel authentication events to the existing event-dispatcher boundary.
 - [x] Document every remaining auth difference found by the targeted comparison
       as an intentional adaptation,
       deferred framework capability, or unresolved gap.
@@ -293,7 +291,8 @@ does not by itself complete a capability.
 
 - [x] Implement event dispatch and listener registration.
 - [x] Define synchronous listener ordering and failure behavior.
-- [ ] Integrate queued listeners after the queue boundary exists.
+- [x] Dispatch gate evaluation events when an application configures a dispatcher.
+- [x] Enqueue explicitly mapped serializable listener jobs through Apalis SQLite.
 
 ### Cache
 
@@ -323,7 +322,10 @@ does not by itself complete a capability.
 - [x] Implement reusable notifications with per-recipient mail channel selection.
 - [x] Add general application-facing mail composition and application-owned rendering conventions.
 - [x] Deliver composed mail through the existing Apalis queue and real worker boundary.
-- [ ] Add queued notification objects, per-channel queue options, events, localization, and additional channels.
+- [x] Render and enqueue recipient-specific notifications as existing mail jobs.
+- [x] Add synchronous notification lifecycle events and queued-send cancellation.
+- [ ] Add queued notification objects, delivery events for queued notifications,
+      per-channel queue options, localization, and additional channels.
 
 ### Filesystems and uploads
 

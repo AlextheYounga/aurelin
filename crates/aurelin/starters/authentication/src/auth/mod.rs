@@ -15,6 +15,7 @@ use aurelin_framework::auth::{
     PasswordResetCredentials, PasswordResetError, PasswordResetRepository, PasswordResetRequest,
     RateLimitOutcome, StoredPasswordResetToken,
 };
+use aurelin_framework::events::EventDispatcher;
 use aurelin_framework::mail::{MailError, Mailer};
 use axum_login::{AuthUser, AuthnBackend, UserId};
 use sea_orm::{
@@ -83,6 +84,7 @@ pub struct AuthBackend {
     passwords: BcryptPasswordHasher,
     attempts: LoginRateLimiter,
     authentication_timebox_duration: Duration,
+    authentication_events: Option<EventDispatcher>,
     password_reset_tokens: PasswordResetBroker<AuthRepository>,
     reset_passwords: ResetPasswords<AuthRepository, ResetUserPassword>,
     create_new_user: CreateNewUser,
@@ -135,11 +137,18 @@ impl AuthBackend {
             attempts: LoginRateLimiter::default(),
             authentication_timebox_duration:
                 aurelin_fortify::axum::DEFAULT_AUTHENTICATION_TIMEBOX_DURATION,
+            authentication_events: None,
         })
     }
 
     pub fn with_authentication_timebox_duration(mut self, duration: Duration) -> Self {
         self.authentication_timebox_duration = duration;
+        self
+    }
+
+    /// Register application-owned observational authentication listeners.
+    pub fn with_authentication_events(mut self, events: EventDispatcher) -> Self {
+        self.authentication_events = Some(events);
         self
     }
 

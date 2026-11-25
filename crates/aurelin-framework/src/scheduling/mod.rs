@@ -24,6 +24,7 @@ struct Task {
     timezone: Tz,
     callback: Arc<Callback>,
     overlap_seconds: Option<i64>,
+    one_server: bool,
 }
 
 struct ScheduleInner {
@@ -45,8 +46,7 @@ impl Schedule {
 
     /// Evaluate one instant, awaiting due tasks in registration order.
     ///
-    /// Each invocation is independent: calling this twice for the same minute
-    /// can execute a task twice. This is not an occurrence deduplication API.
+    /// Tasks without single-server election can run on every invocation.
     pub async fn run_due_at(&self, instant: DateTime<Utc>) -> RunReport {
         let minute = instant.with_second(0).and_then(|time| time.with_nanosecond(0)).unwrap_or(instant);
         let mut tasks = Vec::new();
@@ -54,7 +54,7 @@ impl Schedule {
             if !task.expression.includes(minute.with_timezone(&task.timezone)) {
                 continue;
             }
-            let outcome = self.run_task(task).await;
+            let outcome = self.run_task(task, minute).await;
             tasks.push(TaskResult { name: task.name.clone(), outcome });
         }
         RunReport { tasks }
@@ -65,7 +65,18 @@ impl Schedule {
         self.run_due_at(Utc::now()).await
     }
 
-    async fn run_task(&self, task: &Task) -> TaskOutcome {
+    async fn run_task(&self, task: &Task, minute: DateTime<Utc>) -> TaskOutcome {
+        if task.one_server {
+            // The election survives callback completion so later runners lose as well.
+            if let Some(cache) = &self.inner.cache {
+                let key = format!("{}:occurrence:{}", lock_key(&task.name), minute.timestamp());
+                match cache.lock(&key, 3600).acquire().await {
+                    Ok(true) => {}
+                    Ok(false) => return TaskOutcome::SkippedElection,
+                    Err(error) => return TaskOutcome::Failed(TaskFailure::Election(error)),
+                }
+            }
+        }
         let lock = match (task.overlap_seconds, &self.inner.cache) {
             (Some(seconds), Some(cache)) => Some(cache.lock(&lock_key(&task.name), seconds)),
             _ => None,

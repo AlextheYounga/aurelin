@@ -35,8 +35,10 @@ integration decisions.
 - Application-defined authorization gates and policies
 - SMTP mail delivery
 - SQLite-backed background jobs, retries, failed-job operations, and workers
+- Typed events and queued listeners, mail and notification delivery
 - Typed process-local and Redis caching with atomic owner-safe locks
 - Optional AI development context and local debugging through Aurelin Assist
+- Scheduled callbacks and local or in-memory object storage with streamed uploads
 
 Authentication is split deliberately between reusable packages and generated
 application code. Aurelin provides the secure workflows and contracts; your
@@ -63,8 +65,14 @@ commands.
 
 Register scheduled callbacks in `src/schedule.rs`, then invoke
 `cargo aurelin schedule:run` once per minute from your system scheduler. Use a
-shared Redis cache for overlap prevention across separate processes. See
+shared Redis cache for overlap prevention or per-occurrence single-server
+election across separate processes. See
 `docs/ARCHITECTURE.md` for the supported cron subset and scheduler limitations.
+Redis coordination and cloud storage providers require external qualification;
+cache tags and failover, provider ACLs and temporary URLs, and `schedule:work`
+are not implemented. Local storage roots must be trusted because symlinks are
+followed. Upload filenames and content types are untrusted metadata, not MIME
+validation.
 
 The former `aurelin-cli` package remains on crates.io for existing users, but
 new releases use the `aurelin` package name.

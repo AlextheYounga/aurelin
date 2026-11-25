@@ -10,11 +10,13 @@ use aurelin_framework::{
     },
     inertia::{Inertia, axum::InertiaRequest},
 };
+use axum_login::AuthUser;
 use axum_tower_sessions_csrf::get_or_create_token;
 use serde::{Deserialize, Serialize};
 
 use super::{
     AuthSession, FortifyBackend, FortifyFrontend, FortifyHttpError,
+    events::{self, Login},
     feedback::{FLASH_ERRORS, ValidationErrors, redirect_with_error},
     login_session::{PENDING_REMEMBER_LOGIN, set_login_expiry},
     password_confirmation::{PASSWORD_CONFIRMATION_REDIRECT, password_is_confirmed},
@@ -114,6 +116,7 @@ async fn store_challenge<B: FortifyBackend>(
     auth.login(&user).await.map_err(FortifyHttpError::auth_session)?;
     let remember = auth.session.remove::<bool>(PENDING_REMEMBER_LOGIN).await?.unwrap_or_default();
     set_login_expiry(&auth.session, remember);
+    events::observe(auth.backend.authentication_events(), Login { user_id: user.id(), remember }).await;
     let mut response = request.redirect(Inertia::redirect("/dashboard"))?;
     rate_limit::add_rate_limit_headers(&mut response, TWO_FACTOR_ATTEMPTS_PER_MINUTE, remaining, None);
     Ok(response)
