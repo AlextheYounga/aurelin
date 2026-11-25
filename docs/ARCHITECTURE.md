@@ -159,6 +159,8 @@ password-confirmation, profile, account-deletion, appearance, and a unified
 security screen for password, two-factor, and passkey management. SeaORM 1.1 provides application
 data access, SeaQuery-backed `sea-orm-migration` owns the SQLite schema, and
 SQLx remains SeaORM's driver and the Tower session-store infrastructure.
+Authenticated startup checks for pending migrations without applying them,
+including for in-memory SQLite; migrations are an explicit command or test setup.
 `axum-valid` integrates `validator` with Axum request extraction. `axum-login`
 0.18 provides authenticated sessions and session-ID rotation, and
 `axum-tower-sessions-csrf` 0.1.1 validates state-changing requests.

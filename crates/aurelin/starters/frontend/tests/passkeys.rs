@@ -11,9 +11,15 @@ use tower::ServiceExt;
 #[tokio::test]
 async fn passkey_options_follow_laravels_guest_and_password_confirmed_contract()
 -> Result<(), Box<dyn Error>> {
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",
@@ -149,9 +155,15 @@ async fn passkey_options_follow_laravels_guest_and_password_confirmed_contract()
 #[tokio::test]
 async fn passkey_routes_are_limited_to_ten_attempts_per_identifier_and_address()
 -> Result<(), Box<dyn Error>> {
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",

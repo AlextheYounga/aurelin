@@ -37,9 +37,11 @@ do not use it against a shared database. Migration-changing commands require
 `--force` when `APP_ENV=production`.
 
 `aurelin new` prints the command to migrate; it does not run migrations. The
-authenticated starter rejects pending migrations for file-backed databases, but
-currently **automatically migrates in-memory databases on connection**. This is
-an outstanding exception to explicit migration, not a general startup policy.
+authenticated starter rejects pending migrations for both file-backed and
+in-memory databases; startup never applies them. SeaORM's migration status check
+may create its bookkeeping table. Tests that open a separate application
+connection should explicitly migrate a temporary file-backed SQLite database and
+keep the temporary directory alive for the application's lifetime.
 
 ## Transactions and test data
 
