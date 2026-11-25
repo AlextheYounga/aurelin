@@ -188,6 +188,7 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
         path.join("tests/application.rs"),
         path.join("tests/authentication.rs"),
         path.join("tests/email_verification.rs"),
+        path.join("tests/inertia_ssr.rs"),
         path.join("tests/jobs.rs"),
         path.join("tests/mail_delivery.rs"),
         path.join("tests/password_reset.rs"),

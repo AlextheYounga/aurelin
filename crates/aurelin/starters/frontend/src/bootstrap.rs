@@ -107,6 +107,10 @@ pub async fn application_with_options(
         .merge(aurelin_fortify::axum::routes::<Frontend, AuthBackend>())
         .merge(crate::routes::settings::routes())
         .merge(frontend.asset_routes())
+        .layer(middleware::from_fn_with_state(
+            frontend.ssr(),
+            aurelin_framework::view::inertia_ssr::render_document,
+        ))
         .layer(VersionLayer::new(version))
         .layer(middleware::from_fn(CsrfMiddleware::middleware))
         .layer(auth_layer)

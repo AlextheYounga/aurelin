@@ -54,7 +54,11 @@ async fn serve(
         .map(String::as_str)
         .unwrap_or("http://localhost:8000");
     let mailer = aurelin_framework::mail::Mailer::from_environment(&environment)?;
-    let frontend = frontend::Frontend::new();
+    let ssr_settings =
+        aurelin_framework::view::inertia_ssr::SsrSettings::from_environment(&environment)?;
+    let frontend = frontend::Frontend::new().with_ssr(
+        aurelin_framework::view::inertia_ssr::Ssr::new(ssr_settings)?,
+    );
     let _dev_server = frontend_development_server.then(|| frontend.start_dev_server());
     let listener = TcpListener::bind((config.host.as_str(), config.port)).await?;
     tracing::info!(address = %listener.local_addr()?, "Aurelin listening");

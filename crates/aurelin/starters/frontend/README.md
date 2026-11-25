@@ -29,6 +29,15 @@ while Cargo compiles the release executable:
 cargo build --release
 ```
 
+The backend has an optional Inertia renderer integration configured with
+`INERTIA_SSR_ENABLED` (default `false`), `INERTIA_SSR_URL` (default
+`http://127.0.0.1:13714/render`), `INERTIA_SSR_TIMEOUT_MS` (default `2000`),
+and `INERTIA_SSR_STRICT` (default `false`). The URL must point to a trusted,
+independently managed Inertia renderer; the backend sends page props to it.
+Rendering errors are logged and fall back to client rendering unless strict
+mode is enabled. The generated frontend does not yet provide an SSR server
+entry or build, so leave this disabled until those are supplied.
+
 Routes live in `src/routes/`, configuration in `src/config/`, application
 composition in `src/bootstrap.rs`, database migrations in
 `database/migrations/`, and pages in `resources/js/pages`. SeaORM and SeaQuery
