@@ -7,10 +7,13 @@ use validator::ValidateEmail;
 use crate::LoginRateLimiter;
 
 use super::{
-    CreateUserOutcome, Credentials, FortifyBackend, FortifyHttpError, FortifyUser,
+    CreateUserOutcome, Credentials, FortifyBackend, FortifyHttpError,
     events::{self, Failed, Lockout, Login, Logout, Registered},
-    login_session::{PENDING_REMEMBER_LOGIN, set_login_expiry},
+    login_session::set_login_expiry,
 };
+
+#[cfg(feature = "two-factor-authentication")]
+use super::{FortifyUser, login_session::PENDING_REMEMBER_LOGIN};
 
 #[derive(Clone, Debug)]
 pub struct LoginAttempt {
@@ -24,9 +27,14 @@ pub struct LoginAttempt {
 pub enum LoginOutcome {
     AlreadyAuthenticated,
     Authenticated,
+    #[cfg(feature = "two-factor-authentication")]
     TwoFactorChallenge,
-    InvalidCredentials { remaining: u32 },
-    RateLimited { retry_after: Duration },
+    InvalidCredentials {
+        remaining: u32,
+    },
+    RateLimited {
+        retry_after: Duration,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -72,6 +80,7 @@ pub async fn attempt_login<B: FortifyBackend>(
         events::observe(auth.backend.authentication_events(), Failed).await;
         return Ok(LoginOutcome::InvalidCredentials { remaining });
     };
+    #[cfg(feature = "two-factor-authentication")]
     if user.two_factor_is_enabled() {
         auth.session.insert("login.id", user.id()).await?;
         auth.session.insert(PENDING_REMEMBER_LOGIN, attempt.remember).await?;

@@ -184,6 +184,7 @@ async fn store_login<B: FortifyBackend>(
         LoginOutcome::AlreadyAuthenticated | LoginOutcome::Authenticated => {
             Ok(request.redirect(Inertia::redirect("/dashboard"))?)
         }
+        #[cfg(feature = "two-factor-authentication")]
         LoginOutcome::TwoFactorChallenge => Ok(request.redirect(Inertia::redirect("/two-factor-challenge"))?),
         LoginOutcome::InvalidCredentials { remaining } => {
             let mut response = invalid_credentials(&auth, &request).await?;

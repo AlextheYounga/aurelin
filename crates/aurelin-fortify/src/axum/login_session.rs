@@ -1,5 +1,6 @@
 use tower_sessions::{Expiry, Session, cookie::time::Duration};
 
+#[cfg(feature = "two-factor-authentication")]
 pub(super) const PENDING_REMEMBER_LOGIN: &str = "login.remember";
 
 const SESSION_LIFETIME: Duration = Duration::minutes(120);

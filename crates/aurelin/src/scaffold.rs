@@ -93,7 +93,10 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>,
     }
     if frontend.is_some_and(Frontend::uses_authentication) {
         dependencies["fake"] = value("5");
-        dependencies["aurelin-fortify"] = value(aurelin_dependency(framework, "aurelin-fortify")?);
+        let mut fortify = aurelin_dependency(framework, "aurelin-fortify")?;
+        let features = ["passkeys", "two-factor-authentication"].into_iter().collect::<toml_edit::Array>();
+        fortify.insert("features", features.into());
+        dependencies["aurelin-fortify"] = value(fortify);
     }
     let mut tokio = InlineTable::new();
     tokio.insert("version", "1".into());

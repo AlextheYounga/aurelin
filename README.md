@@ -45,6 +45,27 @@ application code. Aurelin provides the secure workflows and contracts; your
 application owns its users, database models, migrations, policies, mail
 content, and interface.
 
+### Optional authentication packages
+
+`aurelin-framework` does not depend on Fortify. Applications opt into
+`aurelin-fortify` for registration, login, password reset, verification, and
+password confirmation. Fortify has no default features; its heavier capabilities
+are selected explicitly:
+
+```toml
+aurelin-fortify = { version = "0.4.1", features = ["two-factor-authentication", "passkeys"] }
+```
+
+Omit either feature when its workflows are not needed. `passkeys` integrates the
+independent `aurelin-passkeys` package; `two-factor-authentication` includes TOTP,
+QR provisioning, and recovery codes. Generated React, Vue, and Leptos
+authentication starters enable both, preserving their existing configuration.
+Backend-only starters do not depend on Fortify.
+
+Existing applications upgrading from unconditional Fortify support must add
+these features to keep their current APIs and routes. Do not remove two-factor
+support from an application that still requires it for enrolled users.
+
 ## Quick start
 
 Install Aurelin and generate a React application:

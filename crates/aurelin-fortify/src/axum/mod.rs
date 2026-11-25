@@ -16,10 +16,12 @@ use aurelin_framework::{
 };
 use axum_login::{AuthUser, AuthnBackend};
 use serde::Serialize;
+#[cfg(feature = "passkeys")]
 use serde_json::Value;
 use thiserror::Error;
 use tower_sessions::session;
 
+#[cfg(feature = "passkeys")]
 use crate::passkeys::PasskeyCeremony;
 
 pub const DEFAULT_AUTHENTICATION_TIMEBOX_DURATION: Duration = Duration::from_millis(200);
@@ -30,9 +32,11 @@ mod email_verification;
 pub mod events;
 mod feedback;
 mod login_session;
+#[cfg(feature = "passkeys")]
 mod passkeys;
 mod password_confirmation;
 mod password_reset;
+#[cfg(feature = "two-factor-authentication")]
 mod two_factor_authentication;
 
 pub use authentication_workflow::{
@@ -51,6 +55,7 @@ pub struct FortifyComponents {
     pub reset_password: &'static str,
     pub confirm_password: &'static str,
     pub verify_email: &'static str,
+    #[cfg(feature = "two-factor-authentication")]
     pub two_factor_challenge: &'static str,
 }
 
@@ -64,6 +69,7 @@ pub trait FortifyUser: AuthUser<Id = i64> + Clone + Send + Sync + 'static {
 
     fn email(&self) -> &str;
     fn email_is_verified(&self) -> bool;
+    #[cfg(feature = "two-factor-authentication")]
     fn two_factor_is_enabled(&self) -> bool;
     fn public(&self) -> Self::Public;
 }
@@ -79,12 +85,14 @@ pub enum CreateUserOutcome<U> {
     EmailAlreadyExists,
 }
 
+#[cfg(feature = "passkeys")]
 pub enum PasskeyRegistrationOutcome {
     Registered { id: String, name: String },
     AlreadyRegistered,
     Invalid,
 }
 
+#[cfg(feature = "passkeys")]
 pub enum PasskeyLoginOutcome<U> {
     Authenticated(U),
     Invalid,
@@ -97,6 +105,7 @@ pub struct EmailVerificationRequest<'a, U> {
     pub signature: &'a str,
 }
 
+#[cfg(feature = "passkeys")]
 pub struct PasskeyRegistrationRequest<'a, U> {
     pub ceremony_id: &'a str,
     pub user: &'a U,
@@ -147,53 +156,71 @@ where
         &self,
         request: EmailVerificationRequest<'_, Self::User>,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send;
+    #[cfg(feature = "two-factor-authentication")]
     fn two_factor_attempt(&self, user_id: i64) -> impl Future<Output = RateLimitOutcome> + Send;
+    #[cfg(feature = "two-factor-authentication")]
     fn challenged_user(&self, user_id: i64) -> impl Future<Output = Result<Option<Self::User>, Self::Error>> + Send;
+    #[cfg(feature = "two-factor-authentication")]
     fn challenge_two_factor(
         &self,
         user: &Self::User,
         code: Option<&str>,
         recovery_code: Option<&str>,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send;
+    #[cfg(feature = "two-factor-authentication")]
     fn enable_two_factor(&self, user: &Self::User) -> impl Future<Output = Result<Self::User, Self::Error>> + Send;
+    #[cfg(feature = "two-factor-authentication")]
     fn confirm_two_factor(
         &self,
         user: &Self::User,
         code: &str,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send;
+    #[cfg(feature = "two-factor-authentication")]
     fn disable_two_factor(&self, user: &Self::User) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    #[cfg(feature = "two-factor-authentication")]
     fn two_factor_qr_code(&self, user: &Self::User) -> Result<Option<String>, Self::Error>;
+    #[cfg(feature = "two-factor-authentication")]
     fn two_factor_secret_key(&self, user: &Self::User) -> Result<Option<String>, Self::Error>;
+    #[cfg(feature = "two-factor-authentication")]
     fn two_factor_recovery_codes(&self, user: &Self::User) -> Result<Vec<String>, Self::Error>;
+    #[cfg(feature = "two-factor-authentication")]
     fn regenerate_two_factor_recovery_codes(
         &self,
         user: &Self::User,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send;
+    #[cfg(feature = "passkeys")]
     fn passkey_attempt(&self, key: &str) -> impl Future<Output = RateLimitOutcome> + Send;
+    #[cfg(feature = "passkeys")]
     fn start_passkey_registration(
         &self,
         user: &Self::User,
     ) -> impl Future<Output = Result<PasskeyCeremony, Self::Error>> + Send;
+    #[cfg(feature = "passkeys")]
     fn finish_passkey_registration(
         &self,
         request: PasskeyRegistrationRequest<'_, Self::User>,
     ) -> impl Future<Output = Result<PasskeyRegistrationOutcome, Self::Error>> + Send;
+    #[cfg(feature = "passkeys")]
     fn start_passkey_login(&self) -> Result<PasskeyCeremony, Self::Error>;
+    #[cfg(feature = "passkeys")]
     fn finish_passkey_login(
         &self,
         ceremony_id: &str,
         credential: Value,
     ) -> impl Future<Output = Result<PasskeyLoginOutcome<Self::User>, Self::Error>> + Send;
+    #[cfg(feature = "passkeys")]
     fn start_passkey_confirmation(
         &self,
         user: &Self::User,
     ) -> impl Future<Output = Result<PasskeyCeremony, Self::Error>> + Send;
+    #[cfg(feature = "passkeys")]
     fn finish_passkey_confirmation(
         &self,
         ceremony_id: &str,
         user: &Self::User,
         credential: Value,
     ) -> impl Future<Output = Result<bool, Self::Error>> + Send;
+    #[cfg(feature = "passkeys")]
     fn delete_passkey(&self, user_id: i64, passkey_id: i64) -> impl Future<Output = Result<bool, Self::Error>> + Send;
 }
 
@@ -203,13 +230,16 @@ where
     B: FortifyBackend,
     B::Error: Error + Send + Sync + 'static,
 {
-    Router::new()
+    let router = Router::new()
         .merge(authentication::routes::<F, B>())
         .merge(password_reset::routes::<F, B>())
         .merge(email_verification::routes::<F, B>())
-        .merge(password_confirmation::routes::<F, B>())
-        .merge(two_factor_authentication::routes::<F, B>())
-        .merge(passkeys::routes::<F, B>())
+        .merge(password_confirmation::routes::<F, B>());
+    #[cfg(feature = "two-factor-authentication")]
+    let router = router.merge(two_factor_authentication::routes::<F, B>());
+    #[cfg(feature = "passkeys")]
+    let router = router.merge(passkeys::routes::<F, B>());
+    router
 }
 
 #[derive(Debug, Error)]

@@ -166,6 +166,15 @@ applications provide user persistence, migrations, action implementations,
 route/view selection, and frontend pages. The CLI only installs those packages
 and application-owned templates.
 
+Fortify is optional: the framework and backend-only starter do not depend on it.
+Fortify's default Cargo features are empty. `two-factor-authentication` enables
+TOTP, QR provisioning, recovery codes and their HTTP contracts; `passkeys`
+enables the independent passkeys package and its Fortify HTTP contracts.
+Disabled capabilities contribute neither routes nor backend trait requirements.
+Generated authentication starters explicitly enable both features, including
+the Leptos starter's shared backend adapter. Existing applications must retain
+the two-factor feature while enforcing enrollment for existing users.
+
 Both frontend variants share registration, login, logout, remember-me,
 protected dashboard, password-reset, email-verification,
 password-confirmation, profile, account-deletion, appearance, and a unified
