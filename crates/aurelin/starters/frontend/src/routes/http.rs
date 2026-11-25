@@ -37,13 +37,17 @@ async fn welcome(
     auth: AuthSession,
     request: InertiaRequest,
 ) -> Result<Response, WebError> {
-    let csrf_token = get_or_create_token(&auth.session).await.map_err(WebError::Csrf)?;
+    let csrf_token = get_or_create_token(&auth.session)
+        .await
+        .map_err(WebError::Csrf)?;
     Ok(request.render(
         Inertia::response(
             WELCOME_COMPONENT,
             WelcomeProps {
                 message: "Welcome to Aurelin",
-                auth: AuthProps { user: auth.user.as_ref().map(PublicUser::from) },
+                auth: AuthProps {
+                    user: auth.user.as_ref().map(PublicUser::from),
+                },
                 csrf_token,
             },
         ),
