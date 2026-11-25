@@ -1,0 +1,17 @@
+[package]
+name = "aurelin-sanctum"
+version = "0.3.3"
+edition = "2024"
+authors.workspace = true
+description = "Personal access token primitives for Aurelin"
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+aurelin-framework = { version = "0.3.3", path = "../aurelin-framework" }
+constant_time_eq = "0.4"
+rand = "0.9"
+thiserror = "2"
+
+[lints]
+workspace = true

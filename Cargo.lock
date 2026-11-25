@@ -509,6 +509,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "aurelin-sanctum"
+version = "0.3.3"
+dependencies = [
+ "aurelin-framework",
+ "constant_time_eq",
+ "rand 0.9.5",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
