@@ -228,6 +228,16 @@ async fn issued_token_authenticates_bearer_only_and_can_be_revoked() -> Result<(
         )
         .await?;
     assert_eq!(after.status(), StatusCode::UNAUTHORIZED);
+    db.execute_unprepared("DELETE FROM users").await?;
+    let remaining_tokens = db
+        .query_one(Statement::from_string(
+            DatabaseBackend::Sqlite,
+            "SELECT COUNT(*) AS count FROM personal_access_tokens",
+        ))
+        .await?
+        .ok_or("missing token count")?;
+    let remaining_tokens: i64 = remaining_tokens.try_get("", "count")?;
+    assert_eq!(remaining_tokens, 0, "deleting a user must cascade to its tokens");
     drop(db);
     remove_sqlite_files(&path)?;
     Ok(())
