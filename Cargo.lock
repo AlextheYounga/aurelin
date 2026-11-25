@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "aurelin"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -430,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "aurelin-assist"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "aurelin-framework",
@@ -448,7 +448,7 @@ dependencies = [
 
 [[package]]
 name = "aurelin-fortify"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "aurelin-framework",
  "aurelin-passkeys",
@@ -470,7 +470,7 @@ dependencies = [
 
 [[package]]
 name = "aurelin-framework"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "aes-gcm 0.10.3",
  "apalis",
@@ -523,7 +523,7 @@ dependencies = [
 
 [[package]]
 name = "aurelin-passkeys"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "base64 0.22.1",
  "hmac 0.12.1",
@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "aurelin-sanctum"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "aurelin-framework",
  "axum",
