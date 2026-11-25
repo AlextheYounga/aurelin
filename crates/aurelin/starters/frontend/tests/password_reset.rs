@@ -99,21 +99,31 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
         )?)
         .await?;
     assert_eq!(unknown.status(), StatusCode::SEE_OTHER);
-    assert!(
-        response_body(
-            app.clone()
-                .oneshot(request(
-                    Method::GET,
-                    "/forgot-password",
-                    Some(&reset_cookie),
-                    None,
-                    None,
-                )?)
-                .await?,
-        )
+    let unknown_feedback = response_body(
+        app.clone()
+            .oneshot(request(
+                Method::GET,
+                "/forgot-password",
+                Some(&reset_cookie),
+                None,
+                None,
+            )?)
+            .await?,
+    )
+    .await?;
+    assert!(unknown_feedback.contains("We have emailed your password reset link."));
+    let database = Database::connect(&database_url).await?;
+    let unknown_records = database
+        .query_one(Statement::from_sql_and_values(
+            DatabaseBackend::Sqlite,
+            "SELECT COUNT(*) AS count FROM password_reset_tokens WHERE email = ?",
+            ["unknown@example.com".into()],
+        ))
         .await?
-        .contains("We can't find a user")
-    );
+        .ok_or("missing count")?
+        .try_get::<i64>("", "count")?;
+    assert_eq!(unknown_records, 0);
+    database.close().await?;
     let requested = app
         .clone()
         .oneshot(request(
@@ -125,6 +135,23 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
         )?)
         .await?;
     assert_eq!(requested.status(), StatusCode::SEE_OTHER);
+    assert_eq!(
+        unknown.headers()[header::LOCATION],
+        requested.headers()[header::LOCATION]
+    );
+    let known_feedback = response_body(
+        app.clone()
+            .oneshot(request(
+                Method::GET,
+                "/forgot-password",
+                Some(&reset_cookie),
+                None,
+                None,
+            )?)
+            .await?,
+    )
+    .await?;
+    assert_eq!(unknown_feedback, known_feedback);
     let throttled = app
         .clone()
         .oneshot(request(
@@ -149,7 +176,7 @@ async fn a_valid_reset_token_replaces_the_password_and_is_consumed() -> Result<(
                 .await?,
         )
         .await?
-        .contains("Please wait before retrying")
+        .contains("We have emailed your password reset link.")
     );
 
     let token = "known-reset-token";

@@ -7,6 +7,7 @@ use aurelin_framework::{
         routing::{get, post},
     },
     inertia::{Inertia, axum::InertiaRequest},
+    timebox::Timebox,
 };
 use axum_tower_sessions_csrf::get_or_create_token;
 use axum_valid::{Valid, ValidationRejection};
@@ -110,24 +111,17 @@ async fn send_password_reset_link<B: FortifyBackend>(
         }
         Err(ValidationRejection::Inner(error)) => return Ok(error.into_response()),
     };
-    match auth.backend.create_password_reset_token(&input.email).await.map_err(FortifyHttpError::backend)? {
-        PasswordResetRequest::Sent { token } => {
-            auth.backend.send_password_reset(&input.email, &token).await.map_err(FortifyHttpError::backend)?;
+    let timebox = Timebox::start(auth.backend.authentication_timebox_duration());
+    match auth.backend.create_password_reset_token(&input.email).await {
+        Ok(PasswordResetRequest::Sent { token }) => {
+            if auth.backend.send_password_reset(&input.email, &token).await.is_err() {
+                tracing::error!("password reset notification failed");
+            }
         }
-        PasswordResetRequest::UnknownUser => {
-            return redirect_with_error(
-                &auth,
-                &request,
-                ("email", "We can't find a user with that email address."),
-                "/forgot-password",
-            )
-            .await;
-        }
-        PasswordResetRequest::Throttled => {
-            return redirect_with_error(&auth, &request, ("email", "Please wait before retrying."), "/forgot-password")
-                .await;
-        }
+        Ok(PasswordResetRequest::UnknownUser | PasswordResetRequest::Throttled) => {}
+        Err(_) => tracing::error!("password reset request failed"),
     }
+    timebox.wait().await;
     auth.session.insert(FLASH_STATUS, "We have emailed your password reset link.").await?;
     Ok(request.redirect(Inertia::redirect("/forgot-password"))?)
 }
