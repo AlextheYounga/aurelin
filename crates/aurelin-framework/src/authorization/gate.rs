@@ -7,6 +7,25 @@ use std::{
 };
 
 use super::{AuthorizationResponse, IntoAuthorizationResponse, UserGate};
+use crate::events::{DispatchError, EventDispatcher};
+
+/// The result of a gate check, before the default denial is applied.
+pub struct GateEvaluated<User> {
+    /// The user being authorized, or a guest.
+    pub user: Option<User>,
+    /// The checked ability.
+    pub ability: String,
+    /// The resolved result, or `None` if no rule resolved the check.
+    pub result: Option<AuthorizationResponse>,
+    context: Arc<dyn Any + Send + Sync>,
+}
+
+impl<User> GateEvaluated<User> {
+    /// Recover the typed context supplied to the gate.
+    pub fn context<Context: Any>(&self) -> Option<&Context> {
+        self.context.downcast_ref()
+    }
+}
 
 type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
 type AbilityCallback<User> =
@@ -107,6 +126,7 @@ pub struct GateBuilder<User> {
     before: Vec<Arc<BeforeCallback<User>>>,
     after: Vec<Arc<AfterCallback<User>>>,
     default_denial: AuthorizationResponse,
+    events: Option<EventDispatcher>,
 }
 
 impl<User> Default for GateBuilder<User> {
@@ -116,6 +136,7 @@ impl<User> Default for GateBuilder<User> {
             before: Vec::new(),
             after: Vec::new(),
             default_denial: AuthorizationResponse::deny(),
+            events: None,
         }
     }
 }
@@ -220,6 +241,12 @@ where
         self
     }
 
+    /// Dispatch gate evaluation events through the application's dispatcher.
+    pub fn events(&mut self, events: EventDispatcher) -> &mut Self {
+        self.events = Some(events);
+        self
+    }
+
     /// Finish configuring the immutable gate registry.
     pub fn build(&self) -> Gate<User> {
         Gate {
@@ -228,6 +255,7 @@ where
                 before: self.before.clone(),
                 after: self.after.clone(),
                 default_denial: self.default_denial.clone(),
+                events: self.events.clone(),
             }),
         }
     }
@@ -238,6 +266,7 @@ struct GateInner<User> {
     before: Vec<Arc<BeforeCallback<User>>>,
     after: Vec<Arc<AfterCallback<User>>>,
     default_denial: AuthorizationResponse,
+    events: Option<EventDispatcher>,
 }
 
 /// A shared registry of application-defined authorization abilities.
@@ -301,13 +330,26 @@ where
             }
         }
 
+        if let Some(events) = &self.inner.events {
+            events
+                .dispatch(GateEvaluated {
+                    user,
+                    ability: ability.to_owned(),
+                    result: result.clone(),
+                    context: Arc::new(context.clone()),
+                })
+                .await?;
+        }
         Ok(result.unwrap_or_else(|| self.inner.default_denial.clone()))
     }
 }
 
 /// A gate was invoked with an incompatible typed context.
-#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum GateError {
     #[error("ability [{ability}] requires {expected}")]
     ContextMismatch { ability: String, expected: &'static str },
+    /// An evaluation listener failed; authorization did not complete.
+    #[error(transparent)]
+    Event(#[from] DispatchError),
 }

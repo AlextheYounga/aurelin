@@ -64,9 +64,9 @@ produce a failing process status. The starter includes:
   is requested;
 - Axum's native 404 and method-not-allowed behavior.
 
-The health route currently establishes only the default healthy response. Aurelin
-does not yet have Laravel's event dispatcher, so it cannot yet reproduce the
-`DiagnosingHealth` hook or its failure path.
+The health route currently establishes only the default healthy response. The
+existing event dispatcher is not yet wired to Laravel's `DiagnosingHealth` hook
+or its failure path.
 
 ### Inertia protocol
 
@@ -215,8 +215,8 @@ than treating this as a blanket complete-starter claim.
 
 The targeted comparison leaves these explicit authentication boundaries:
 
-- authentication events remain deferred until Aurelin has a general event
-  dispatcher, as tracked in the roadmap;
+- authentication events remain deferred: the existing event dispatcher is not
+  yet wired into the authentication workflows;
 - all default authentication features are currently generated together;
   Laravel's feature-selective starter generation is pending a product decision;
 - Aurelin currently targets the official Inertia starter workflow, not
@@ -255,10 +255,16 @@ route handler and reads the user installed by `AuthManagerLayer`. Resource
 handlers load their models through Axum and SeaORM before calling
 `gate.for_user(...).authorize(...)`; Aurelin does not introduce an implicit
 Eloquent-style model-binding layer. Inline `allow_if` and `deny_if` checks bypass
-registered hooks as they do in Laravel. Gate evaluation events remain deferred
-until Aurelin's general event dispatcher exists, policy generation belongs to
-the later CLI-tooling milestone, and authorization props for Inertia remain an
-application presentation decision as Laravel documents.
+registered hooks as they do in Laravel. A gate can explicitly use the shared event
+dispatcher: `GateEvaluated<User>` is dispatched after the after hooks, with the
+typed context, user, ability, and unresolved-or-resolved result. Listeners cannot
+replace the authorization result; a listener error fails the check. Policy
+generation belongs to the later CLI-tooling milestone, and authorization props
+for Inertia remain an application presentation decision as Laravel documents.
+The event boundary was compared with Laravel Framework 13.x commit
+`321caf77d6c037577434e177c3bf280abb2b3513`, including
+`src/Illuminate/Auth/Access/Gate.php`, `Events/GateEvaluated.php`, and
+`tests/Auth/AuthAccessGateTest.php`.
 
 ### Cache foundation
 
@@ -399,9 +405,8 @@ events, broadcasting, and queued listeners also remain deferred. A future
 queued-listener adapter can register through the existing async listener seam
 and use Apalis without coupling this dispatcher to the queue today.
 
-Authentication, authorization gate, and health diagnostic events remain
-follow-up consumers of this foundation; this branch does not add those
-integrations.
+Authentication and health diagnostic events remain unwired consumers of this
+foundation. Gate evaluation events are described in the authorization section.
 
 ### Notifications and mail
 

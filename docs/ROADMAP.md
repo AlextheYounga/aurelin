@@ -109,8 +109,7 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [x] Shut down gracefully after Ctrl+C.
 - [x] Test generated applications through their compiled process and HTTP
       boundary.
-- [ ] Add Laravel's health diagnostic event hook after an event dispatcher is
-      available.
+- [ ] Wire Laravel's health diagnostic event hook to the existing event dispatcher.
 - [ ] Add consistent Laravel-style HTTP error rendering.
 
 ## 2. Inertia React and Vue foundation
@@ -245,8 +244,7 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [x] Perform a final targeted comparison of routes, props, redirects,
       validation responses, and security invariants against the pinned Laravel
       13 starter reference.
-- [ ] Map Laravel authentication events after Aurelin has an approved general
-      event-dispatcher boundary.
+- [ ] Map Laravel authentication events to the existing event-dispatcher boundary.
 - [x] Document every remaining auth difference found by the targeted comparison
       as an intentional adaptation,
       deferred framework capability, or unresolved gap.
@@ -284,6 +282,7 @@ does not by itself complete a capability.
 
 - [x] Implement event dispatch and listener registration.
 - [x] Define synchronous listener ordering and failure behavior.
+- [x] Dispatch gate evaluation events when an application configures a dispatcher.
 - [ ] Integrate queued listeners after the queue boundary exists.
 
 ### Cache
