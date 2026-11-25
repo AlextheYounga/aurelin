@@ -36,6 +36,7 @@ integration decisions.
 - SMTP mail delivery
 - SQLite-backed background jobs, retries, failed-job operations, and workers
 - Typed process-local and Redis caching with atomic owner-safe locks
+- Optional AI development context and local debugging through Aurelin Assist
 
 Authentication is split deliberately between reusable packages and generated
 application code. Aurelin provides the secure workflows and contracts; your
@@ -106,6 +107,23 @@ browser routes. Only a SHA-256 digest is stored; protect the plaintext token as
 a password. Abilities constrain token access but do not replace application
 authorization policies. This is not OAuth or JWT authentication.
 
+## AI-assisted development and debugging
+
+From this checkout, install the development tool with
+`cargo install --path crates/aurelin-assist`, then run these in your application:
+
+```sh
+aurelin-assist install --playwright
+aurelin-assist doctor
+```
+
+Assist supplies managed agent guidelines/skills and read-only MCP tools for
+locked package versions, backend logs, last errors, and SQLite schema inspection.
+Set `ASSIST_LOG=true` locally to capture structured backend logs. Optional
+companions cover browser reproduction (Playwright), async tasks (Tokio Console),
+and native debugging (RustRover's debugger MCP). External tools are not installed
+automatically. See [the setup and safety guide](docs/AI_ASSIST.md).
+
 ## The Aurelin approach
 
 Rust has excellent web libraries. Aurelin does not hide or duplicate them. It
@@ -166,6 +184,7 @@ Applications may opt into `http::errors::AppError` and register their own Axum
 | `aurelin-fortify` | Headless authentication workflows and Axum integration |
 | `aurelin-passkeys` | WebAuthn registration and authentication ceremonies |
 | `aurelin` | Application generation and shell completions |
+| `aurelin-assist` | Local AI context, managed agent resources, and read-only MCP diagnostics |
 
 ## Project status
 

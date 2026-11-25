@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/aurelin", "crates/aurelin-fortify", "crates/aurelin-framework", "crates/aurelin-passkeys", "crates/aurelin-sanctum"]
+members = ["crates/aurelin", "crates/aurelin-assist", "crates/aurelin-fortify", "crates/aurelin-framework", "crates/aurelin-passkeys", "crates/aurelin-sanctum"]
 resolver = "3"
 
 [workspace.package]
@@ -7,6 +7,9 @@ authors = ["Alex Younger"]
 description = "Aurelin is a Rust translation of Laravel"
 license = "MIT"
 repository = "https://github.com/AlextheYounga/aurelin.git"
+
+[workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
 
 [workspace.lints.clippy]
 correctness = { level = "deny", priority = -1 }

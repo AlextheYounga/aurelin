@@ -1,0 +1,25 @@
+[package]
+name = "aurelin-assist"
+version = "0.4.0"
+edition = "2024"
+authors.workspace = true
+description = "Local AI development context and debugging tools for Aurelin"
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+anyhow = "1"
+aurelin-framework = { version = "0.4.0", path = "../aurelin-framework" }
+clap = { version = "4", features = ["derive"] }
+clap_complete = "4"
+rmcp = { version = "3.11", default-features = false, features = ["server", "macros", "transport-io"] }
+sea-orm = { version = "1.1", default-features = false, features = ["runtime-tokio-rustls", "sqlx-sqlite"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "process"] }
+toml_edit = "0.25"
+url = "2"
+
+[lints]
+workspace = true
