@@ -86,7 +86,7 @@ struct ErrorBody<'a> {
 }
 
 impl ValidationResponse {
-    fn from_rejection<E: IntoResponse>(rejection: ValidRejection<E>) -> Self {
+    pub(super) fn from_rejection<E: IntoResponse>(rejection: ValidRejection<E>) -> Self {
         match rejection {
             ValidRejection::Valid(errors) => Self {
                 status: StatusCode::UNPROCESSABLE_ENTITY,

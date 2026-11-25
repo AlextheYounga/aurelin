@@ -106,8 +106,27 @@ For JSON APIs, `aurelin_framework::validation::http::Validated` composes
 `validator` and Axum extractors for JSON, forms, query strings, and paths. It
 returns safe JSON errors, including structured rule codes, on invalid input.
 Apply authorization in an outer route layer or an earlier parts extractor:
-authorization inside the handler runs after validation. These extractors do not
-yet implement browser or Inertia validation redirects and session flashing.
+authorization inside the handler runs after validation. For browser/Inertia
+forms, use `validation::browser::BrowserValidated` instead: implement
+`OldInput` on the request type to explicitly select non-sensitive plain-text
+fields, install `flash_middleware` inside the session layer, and call
+`validation_page_props` with each Inertia page's props before rendering.
+Never select passwords, credentials, tokens, secrets, or uploaded content.
+This explicit projection is application-owned and cannot be checked by the
+framework. Use an empty projection when no input is safe to flash.
+
+Browser failures redirect to the same-host Referer path (or `/`); PUT, PATCH,
+DELETE and QUERY use 303, other methods use 302. X-Inertia requests redirect
+even when they accept JSON. Other JSON requests keep structured JSON errors.
+Malformed or unsupported payloads return safe JSON errors for all clients;
+only semantic validation failures are redirected.
+The `X-Inertia-Error-Bag` header selects an optional bag. Errors use the first
+message per field and old input is exposed as `old`. Flash data is removed on
+the next request, including unrelated requests; concurrent requests may race,
+and there is no automatic reflash across extra redirects or asset-version
+reloads. Unlike Laravel, input is not flashed by default. `inertia_rs` 0.4
+inserts its default `errors` before shared-prop resolution, so the page-prop
+helper is required rather than registering an `errors` shared prop.
 Applications may opt into `http::errors::AppError` and register their own Axum
 404/405 fallbacks; this does not change existing authentication responses.
 

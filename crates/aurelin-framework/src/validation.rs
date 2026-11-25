@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use validator::{ValidationErrors, ValidationErrorsKind};
 
+pub mod browser;
 pub mod http;
 
 /// A single failed rule at a concrete, dot-separated field path.
