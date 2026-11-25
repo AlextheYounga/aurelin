@@ -3,6 +3,7 @@ use std::{
     any::{Any, TypeId, type_name},
     collections::HashMap,
     error::Error,
+    fmt,
     future::Future,
     pin::Pin,
     sync::Arc,
@@ -104,6 +105,12 @@ struct EventDispatcherInner {
 #[derive(Clone)]
 pub struct EventDispatcher {
     inner: Arc<EventDispatcherInner>,
+}
+
+impl fmt::Debug for EventDispatcher {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("EventDispatcher").field("event_types", &self.inner.listeners.len()).finish()
+    }
 }
 
 impl EventDispatcher {

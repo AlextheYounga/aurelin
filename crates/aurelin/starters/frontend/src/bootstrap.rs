@@ -1,5 +1,6 @@
 use aurelin_framework::{
     axum::{Router, middleware},
+    events::EventDispatcher,
     inertia::axum::VersionLayer,
 };
 use axum_login::AuthManagerLayerBuilder;
@@ -14,6 +15,7 @@ use crate::{auth::AuthBackend, frontend::Frontend};
 pub struct ApplicationOptions {
     pub mailer: Mailer,
     pub authentication_timebox_duration: Duration,
+    pub authentication_events: Option<EventDispatcher>,
 }
 
 impl Default for ApplicationOptions {
@@ -22,6 +24,7 @@ impl Default for ApplicationOptions {
             mailer: Mailer::log(),
             authentication_timebox_duration:
                 aurelin_fortify::axum::DEFAULT_AUTHENTICATION_TIMEBOX_DURATION,
+            authentication_events: None,
         }
     }
 }
@@ -88,19 +91,19 @@ pub async fn application_with_options(
         "aurelin_session",
         secure_cookie,
     );
-    let auth_layer = AuthManagerLayerBuilder::new(
-        AuthBackend::new(
-            database,
-            application_key,
-            application_environment,
-            application_url,
-            options.mailer,
-        )
-        .await?
-        .with_authentication_timebox_duration(options.authentication_timebox_duration),
-        session_layer,
+    let mut auth_backend = AuthBackend::new(
+        database,
+        application_key,
+        application_environment,
+        application_url,
+        options.mailer,
     )
-    .build();
+    .await?
+    .with_authentication_timebox_duration(options.authentication_timebox_duration);
+    if let Some(events) = options.authentication_events {
+        auth_backend = auth_backend.with_authentication_events(events);
+    }
+    let auth_layer = AuthManagerLayerBuilder::new(auth_backend, session_layer).build();
 
     Ok(Router::new()
         .merge(crate::routes::http::routes())

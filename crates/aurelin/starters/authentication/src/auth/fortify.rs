@@ -30,6 +30,10 @@ impl FortifyUser for User {
 }
 
 impl FortifyBackend for AuthBackend {
+    fn authentication_events(&self) -> Option<&aurelin_framework::events::EventDispatcher> {
+        self.authentication_events.as_ref()
+    }
+
     fn authentication_timebox_duration(&self) -> std::time::Duration {
         self.authentication_timebox_duration
     }

@@ -1,16 +1,74 @@
 use std::{
+    convert::Infallible,
     error::Error,
     net::SocketAddr,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
     time::{Duration, Instant},
 };
 
+use aurelin_fortify::axum::events::Registered;
 use aurelin_framework::axum::{
     body::{Body, to_bytes},
     extract::ConnectInfo,
     http::{Method, Request, Response, StatusCode, header},
 };
-use __AURELIN_CRATE__::{bootstrap::application, frontend::Frontend};
+use aurelin_framework::events::EventDispatcher;
+use __AURELIN_CRATE__::{
+    bootstrap::{ApplicationOptions, application, application_with_options},
+    frontend::Frontend,
+};
 use tower::ServiceExt;
+
+#[tokio::test]
+async fn application_registered_authentication_listener_observes_successful_registration()
+-> Result<(), Box<dyn Error>> {
+    let registrations = Arc::new(AtomicUsize::new(0));
+    let observed = Arc::clone(&registrations);
+    let mut events = EventDispatcher::builder();
+    events.listen(move |_: Arc<Registered>| {
+        let observed = Arc::clone(&observed);
+        async move {
+            observed.fetch_add(1, Ordering::SeqCst);
+            Ok::<_, Infallible>(())
+        }
+    });
+    let app = application_with_options(
+        Frontend::new(),
+        "sqlite::memory:",
+        false,
+        b"test-key",
+        "local",
+        "http://localhost:8000",
+        ApplicationOptions {
+            authentication_events: Some(events.build()),
+            ..ApplicationOptions::default()
+        },
+    )
+    .await?;
+    let register_page = app
+        .clone()
+        .oneshot(request(Method::GET, "/register", None, None, None)?)
+        .await?;
+    let cookie = session_cookie(&register_page)?;
+    let csrf = csrf_token(register_page).await?;
+    let response = app
+        .oneshot(request(
+            Method::POST,
+            "/register",
+            Some(&cookie),
+            Some(&csrf),
+            Some(registration_json()),
+        )?)
+        .await?;
+
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(response.headers()[header::LOCATION], "/dashboard");
+    assert_eq!(registrations.load(Ordering::SeqCst), 1);
+    Ok(())
+}
 
 #[tokio::test]
 async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
@@ -384,6 +442,7 @@ async fn failed_credentials_are_timeboxed_while_successful_credentials_return_ea
         __AURELIN_CRATE__::bootstrap::ApplicationOptions {
             mailer: aurelin_framework::mail::Mailer::log(),
             authentication_timebox_duration: minimum_duration,
+            authentication_events: None,
         },
     )
     .await?;
