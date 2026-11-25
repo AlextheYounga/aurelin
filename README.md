@@ -229,13 +229,18 @@ flows, but Aurelin does not yet claim complete Laravel parity.
 
 ## Development
 
-Run the complete validation suite from the repository root:
+Run the normal development checks from the repository root:
 
 ```sh
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
+
+Tests exercise framework behavior directly and test the generator by creating
+temporary projects and checking its output. They do not launch nested Cargo
+builds, linters, or frontend toolchains. Starter compilation is not verified by
+these tests.
 
 Generate shell completions with:
 

@@ -107,8 +107,8 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [x] Serve real HTTP through Axum and Tokio.
 - [x] Provide the `/up` health endpoint.
 - [x] Shut down gracefully after Ctrl+C.
-- [x] Test generated applications through their compiled process and HTTP
-      boundary.
+- [x] Test scaffold output without nested builds; test framework runtime behavior
+      through its public boundaries.
 - [x] Wire a health diagnostic event hook and failure response to the event dispatcher.
 - [ ] Add consistent Laravel-style HTTP error rendering.
 

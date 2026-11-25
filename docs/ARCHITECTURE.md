@@ -685,6 +685,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-The test suite creates a project in a temporary directory, compiles and tests
-that generated project, starts its actual binary on an ephemeral port, sends
-HTTP requests, verifies failure paths, and exercises graceful shutdown.
+Generator tests create temporary projects and verify scaffold output without
+building or running them. Framework integration tests exercise runtime behavior
+through its public boundaries. Tests do not launch nested Cargo builds, linters,
+or frontend toolchains; generated-project compilation is not covered.

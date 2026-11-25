@@ -121,8 +121,34 @@ fn generated_wasm_projects_include_required_hidden_configuration() -> TestResult
         .output()?;
 
     assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+    let next_steps = String::from_utf8_lossy(&result.stderr);
+    assert!(next_steps.contains("cargo leptos watch"));
+    assert!(!next_steps.contains("npm install"));
     for path in [".cargo/config.toml", ".env", ".env.example", ".gitignore"] {
         assert!(destination.join(path).is_file(), "generated project is missing {path}");
+    }
+    Ok(())
+}
+
+#[test]
+fn authentication_projects_have_distinct_application_keys_and_local_sqlite_configuration() -> TestResult {
+    let directory = TempDir::new()?;
+    let mut keys = Vec::new();
+    for frontend in ["react", "vue", "wasm"] {
+        let destination = directory.path().join(frontend);
+        let result = Command::new(env!("CARGO_BIN_EXE_aurelin"))
+            .args(["new", "--no-interaction", "--frontend", frontend])
+            .arg(&destination)
+            .output()?;
+        assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+        let environment = fs::read_to_string(destination.join(".env"))?;
+        let key = environment.lines().find_map(|line| line.strip_prefix("APP_KEY=")).ok_or("missing APP_KEY")?;
+        assert!(!key.is_empty());
+        assert!(!key.contains("change-this"));
+        assert!(!keys.iter().any(|previous| previous == key), "application key reused between projects");
+        keys.push(key.to_owned());
+        assert!(environment.contains("DATABASE_URL=sqlite://database/database.sqlite?mode=rwc"));
+        assert!(destination.join("database/database.sqlite").is_file());
     }
     Ok(())
 }
