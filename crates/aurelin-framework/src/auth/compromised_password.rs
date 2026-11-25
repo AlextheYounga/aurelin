@@ -3,6 +3,8 @@ use std::time::Duration;
 use reqwest::Client;
 use sha1::{Digest, Sha1};
 
+use crate::http::install_tls_provider;
+
 const HIBP_RANGE_ENDPOINT: &str = "https://api.pwnedpasswords.com/range";
 
 #[derive(Clone, Debug)]
@@ -13,12 +15,13 @@ pub struct CompromisedPasswordChecker {
 
 impl Default for CompromisedPasswordChecker {
     fn default() -> Self {
-        Self { client: Client::new(), endpoint: HIBP_RANGE_ENDPOINT.into() }
+        Self::for_endpoint(HIBP_RANGE_ENDPOINT)
     }
 }
 
 impl CompromisedPasswordChecker {
     pub fn for_endpoint(endpoint: impl Into<String>) -> Self {
+        install_tls_provider();
         Self { client: Client::new(), endpoint: endpoint.into() }
     }
 

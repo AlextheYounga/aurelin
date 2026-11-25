@@ -106,5 +106,6 @@ impl Schedule {
 pub fn lock_key(name: &str) -> String {
     use sha2::{Digest, Sha256};
     let digest = Sha256::digest(name.as_bytes());
-    format!("aurelin:schedule:{digest:x}")
+    let digest: String = digest.iter().map(|byte| format!("{byte:02x}")).collect();
+    format!("aurelin:schedule:{digest}")
 }

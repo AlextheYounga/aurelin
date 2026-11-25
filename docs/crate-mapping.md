@@ -89,6 +89,26 @@ reuse; it does not mean every row belongs in v1.
 
 ## Gaps and cautions
 
+- `aurelin-fortify` is an opt-in package, never a dependency of
+  `aurelin-framework`. Its default feature set is empty; `passkeys` enables
+  `aurelin-passkeys` and Fortify's passkey contracts/routes, while
+  `two-factor-authentication` enables TOTP/QR/recovery-code integration and
+  its contracts/routes. Generated authentication starters explicitly enable
+  both. Generic hashing, encryption, reset-token and rate-limit primitives
+  remain in the framework; Fortify workflows stay in Fortify. This translates
+  the configurable features in Laravel Fortify 1.x `src/Features.php` into
+  Cargo compile-time selection, not runtime toggles.
+- Outbound HTTP uses Reqwest 0.13 `rustls-no-provider` with an explicit Rustls
+  0.23 Ring dependency, matching SQLx and Lettre rather than also compiling
+  AWS-LC. Framework HTTP client constructors install Ring if no process-wide
+  provider has already been selected; an application-installed provider wins.
+- Aurelin's direct RustCrypto dependencies use `aes-gcm` 0.11, `hmac` 0.13,
+  `hkdf` 0.13 and `sha2` 0.11. The encrypted payload format, key derivation,
+  URL signatures, passkey user handles and token digests are unchanged and
+  checked against vectors captured with the previous crate versions. Older
+  digest/SHA-256 dependencies may remain through SeaORM/SQLx and other crates;
+  SeaORM and its selected features are unchanged.
+
 - A crate feature is not automatically Laravel-equivalent. Preserve Laravel 13
   defaults, success/failure behavior, status codes, redirects, validation
   shape, and security behavior when translating a requested capability.

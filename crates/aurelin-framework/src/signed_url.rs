@@ -1,4 +1,4 @@
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 use thiserror::Error;
 
@@ -20,7 +20,7 @@ impl TemporarySignedUrl {
     pub fn sign(&self, path_and_query: &str) -> Result<String, SignedUrlError> {
         let mut mac = HmacSha256::new_from_slice(&self.key).map_err(|_| SignedUrlError::Key)?;
         mac.update(path_and_query.as_bytes());
-        Ok(format!("{:x}", mac.finalize().into_bytes()))
+        Ok(mac.finalize().into_bytes().iter().map(|byte| format!("{byte:02x}")).collect())
     }
 
     pub fn verify(&self, path_and_query: &str, signature: &str) -> Result<bool, SignedUrlError> {

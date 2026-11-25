@@ -11,6 +11,8 @@ use axum::{
 };
 use inertia_rs::HtmlResponseContext;
 use reqwest::{header::CONTENT_TYPE, redirect::Policy};
+
+use crate::http::install_tls_provider;
 use serde::Deserialize;
 use thiserror::Error;
 use url::Url;
@@ -76,6 +78,7 @@ pub struct SsrClient {
 
 impl SsrClient {
     pub fn new(config: SsrConfig) -> Result<Self, reqwest::Error> {
+        install_tls_provider();
         let client = reqwest::Client::builder().redirect(Policy::none()).timeout(config.timeout).build()?;
         Ok(Self { config, client })
     }

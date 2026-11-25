@@ -4,8 +4,16 @@ use axum::{
     http::{HeaderValue, StatusCode, header, header::IntoHeaderName},
     response::{IntoResponse, Response},
 };
+use rustls::crypto::ring;
 
 pub mod errors;
+
+pub(crate) fn install_tls_provider() {
+    // Reqwest's rustls-no-provider requires explicit process-wide selection.
+    // Installation is atomic; an existing application choice (or another
+    // concurrent constructor) takes precedence and is never replaced.
+    let _ = ring::default_provider().install_default();
+}
 
 pub fn too_many_attempts(limit: u32, retry_after: Duration) -> Response {
     let retry_after = retry_after.as_secs().max(1);

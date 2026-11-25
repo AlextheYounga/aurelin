@@ -31,8 +31,7 @@ impl ApplicationEncrypter {
     pub fn encrypt(&self, plaintext: &[u8]) -> Result<String, EncryptionError> {
         let mut nonce = [0_u8; NONCE_LENGTH];
         rand::rng().fill(&mut nonce);
-        let ciphertext =
-            self.cipher.encrypt(Nonce::from_slice(&nonce), plaintext).map_err(|_| EncryptionError::Encrypt)?;
+        let ciphertext = self.cipher.encrypt(&Nonce::from(nonce), plaintext).map_err(|_| EncryptionError::Encrypt)?;
         let mut payload = Vec::with_capacity(nonce.len() + ciphertext.len());
         payload.extend_from_slice(&nonce);
         payload.extend_from_slice(&ciphertext);
@@ -42,7 +41,8 @@ impl ApplicationEncrypter {
     pub fn decrypt(&self, payload: &str) -> Result<Vec<u8>, EncryptionError> {
         let payload = URL_SAFE_NO_PAD.decode(payload).map_err(|_| EncryptionError::InvalidPayload)?;
         let (nonce, ciphertext) = payload.split_at_checked(NONCE_LENGTH).ok_or(EncryptionError::InvalidPayload)?;
-        self.cipher.decrypt(Nonce::from_slice(nonce), ciphertext).map_err(|_| EncryptionError::InvalidPayload)
+        let nonce = Nonce::try_from(nonce).map_err(|_| EncryptionError::InvalidPayload)?;
+        self.cipher.decrypt(&nonce, ciphertext).map_err(|_| EncryptionError::InvalidPayload)
     }
 }
 

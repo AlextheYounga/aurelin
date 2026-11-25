@@ -38,6 +38,9 @@ fn user_handles_are_stable_opaque_and_application_specific() -> Result<(), Box<d
     let first = Passkeys::new(config(b"first-secret"))?;
     let second = Passkeys::new(config(b"second-secret"))?;
 
+    // Captured with hmac 0.12.1 / sha2 0.10.9. Existing credentials must keep
+    // identifying the same user after dependency upgrades.
+    assert_eq!(first.user_handle("42")?.to_string(), "66665800-38ed-cde6-94cd-8d8565cbf6fb");
     assert_eq!(first.user_handle("42")?, first.user_handle("42")?);
     assert_ne!(first.user_handle("42")?, first.user_handle("43")?);
     assert_ne!(first.user_handle("42")?, second.user_handle("42")?);
