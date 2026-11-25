@@ -22,6 +22,7 @@ integration decisions.
 - Graceful shutdown and health checks
 - Inertia 3 integration for React 19 and Vue 3
 - Vite development and embedded production assets
+- Inertia SSR for React and Vue with a separately managed Node.js 22+ renderer
 - Leptos SSR and WebAssembly hydration without Node.js
 - SQLite persistence with SeaORM
 - Persisted sessions and CSRF protection

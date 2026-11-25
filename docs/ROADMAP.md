@@ -127,7 +127,7 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [x] Compile, lint, test, and typecheck generated React and Vue applications.
 - [ ] Reassess async prop support against future starter requirements.
 - [ ] Reassess validation error bags where `inertia_rs` remains partial.
-- [ ] Add Inertia SSR in the later SSR milestone.
+- [x] Add Inertia SSR for generated React and Vue applications.
 
 ## 3. Built-in authentication starter
 
@@ -334,7 +334,6 @@ does not by itself complete a capability.
 
 ## Deferred work
 
-- Inertia SSR.
 - Full browser WebAuthn qualification pending an approved reliable test setup.
 
 ## Excluded work

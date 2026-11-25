@@ -80,8 +80,10 @@ SSR and asynchronous prop resolvers as unsupported, and validation error bags
 as partial. `inertia_rs` 0.4 calls the HTML document callback synchronously;
 Aurelin marks that response with its script-safe page context and awaits the
 renderer in Axum middleware. The dependency still decides HTML versus JSON and
-handles version conflicts. This provides the backend SSR seam, but the generated
-frontends do not yet include the Node renderer entries or hydration builds.
+handles version conflicts. Generated React and Vue applications provide official
+Inertia Node renderer entries and hydration-capable browser entries. The Node
+renderer runs separately and receives only page JSON. Renderer failures fall
+back to the script-safe client document unless strict mode is enabled.
 The official `inertiajs/inertia-laravel-rust`
 port was also inspected at its 2026-11-18 `main` branch: it is alpha,
 unpublished to crates.io, and requires Rust 1.99, so it is not a compatible v1

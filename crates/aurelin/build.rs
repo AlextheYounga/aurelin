@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const EXCLUDED_DIRECTORIES: &[&str] = &[".git", "node_modules", "target"];
+const EXCLUDED_DIRECTORIES: &[&str] = &[".git", "node_modules", "target", "dist"];
 const REQUIRED_TEMPLATE_FILES: &[&str] = &[
     "authentication/.env.example",
     "base/.cargo/config.toml",
@@ -48,6 +48,9 @@ fn copy_template(source: &Path, destination: &Path) -> io::Result<()> {
         let entry = entry?;
         let file_type = entry.file_type()?;
         let name = entry.file_name();
+        if source.file_name().is_some_and(|parent| parent == "bootstrap") && name == "ssr" {
+            continue;
+        }
         if file_type.is_dir() && EXCLUDED_DIRECTORIES.iter().any(|excluded| name == *excluded) {
             continue;
         }

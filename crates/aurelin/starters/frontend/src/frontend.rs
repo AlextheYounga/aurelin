@@ -96,6 +96,11 @@ impl aurelin_fortify::axum::FortifyFrontend for Frontend {
 fn document_html(context: &HtmlResponseContext, rendered: Option<&SsrResponse>) -> String {
     let page = context.data_page();
     let head = rendered.map_or_else(String::new, |ssr| ssr.head.join("\n"));
+    let title = if head.contains("<title") {
+        ""
+    } else {
+        "<title>Aurelin</title>"
+    };
     let body = rendered.map_or_else(
         || format!(r#"<script type="application/json" data-page="app">{page}</script><div id="app"></div>"#),
         |ssr| ssr.body.clone(),
@@ -106,7 +111,7 @@ fn document_html(context: &HtmlResponseContext, rendered: Option<&SsrResponse>) 
         ""
     };
     format!(
-        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Aurelin</title>{head}{react_refresh}<script type="module" src="/@vite/client"></script><script type="module" src="/{DEV_SCRIPT}"></script></head><body>{body}</body></html>"#,
+        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">{title}{head}{react_refresh}<script type="module" src="/@vite/client"></script><script type="module" src="/{DEV_SCRIPT}"></script></head><body>{body}</body></html>"#,
     )
 }
 
@@ -117,7 +122,9 @@ fn document_html(context: &HtmlResponseContext, rendered: Option<&SsrResponse>) 
         |index| {
             let html = String::from_utf8_lossy(&index.bytes);
             if let Some(ssr) = rendered {
-                html.replace("</head>", &format!("{}</head>", ssr.head.join("\n"))).replace(BODY_MARKER, &ssr.body)
+                let head = ssr.head.join("\n");
+                let html = if head.contains("<title") { html.replace("<title>Aurelin</title>", "") } else { html.into_owned() };
+                html.replace("</head>", &format!("{head}</head>")).replace(BODY_MARKER, &ssr.body)
             } else {
                 html.replace(
                     BODY_MARKER,

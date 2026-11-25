@@ -195,6 +195,7 @@ fn install(path: &Path, framework: &FrameworkSource, frontend: Option<Frontend>)
         path.join("tests/password_policy.rs"),
         path.join("tests/password_rehash.rs"),
         path.join("tests/remember_me.rs"),
+        path.join("tests/real_inertia_ssr.rs"),
         path.join("tests/passkeys.rs"),
         path.join("tests/settings.rs"),
         path.join("tests/two_factor_authentication.rs"),
