@@ -40,6 +40,13 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Run the registered application seeders
+    #[command(name = "db:seed")]
+    DbSeed {
+        /// Run the command in production
+        #[arg(long)]
+        force: bool,
+    },
     /// Process queued jobs
     #[command(name = "queue:work")]
     QueueWork,
@@ -103,6 +110,12 @@ pub async fn run(environment: HashMap<String, String>) -> Result<(), Box<dyn Err
         Some(Command::MigrateFresh { force }) => {
             ensure_safe_environment(&environment, force)?;
             crate::database::fresh(database_url(&environment)).await
+        }
+        Some(Command::DbSeed { force }) => {
+            if environment.get("APP_ENV").map(String::as_str) == Some("production") && !force {
+                return Err("refusing to seed in production without --force".into());
+            }
+            crate::seed::run(database_url(&environment)).await
         }
         Some(Command::QueueWork) => crate::jobs::work(database_url(&environment)).await,
         Some(Command::ScheduleRun) => {

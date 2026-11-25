@@ -13,13 +13,15 @@ pub mod bootstrap;
 pub mod config;
 pub mod console;
 pub mod database;
-mod entities;
+pub mod entities;
+pub mod factory;
 pub mod frontend;
 pub mod jobs;
 #[path = "../database/migrations/mod.rs"]
 mod migrations;
 pub mod routes;
 pub mod schedule;
+pub mod seed;
 
 pub async fn run() -> Result<(), Box<dyn Error>> {
     tracing_subscriber::fmt()

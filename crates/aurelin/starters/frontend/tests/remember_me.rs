@@ -10,9 +10,15 @@ use tower::ServiceExt;
 
 #[tokio::test]
 async fn remember_me_extends_the_authenticated_session_cookie() -> Result<(), Box<dyn Error>> {
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",

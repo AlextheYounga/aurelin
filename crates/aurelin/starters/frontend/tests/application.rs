@@ -18,10 +18,68 @@ use __AURELIN_CRATE__::{
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn initial_visit_contains_the_inertia_page_and_vite_entry() -> Result<(), Box<dyn Error>> {
-    let response = application(
+async fn startup_requires_explicit_migrations_for_memory_and_file_databases()
+-> Result<(), Box<dyn Error>> {
+    let error = application(
         Frontend::new(),
         "sqlite::memory:",
+        false,
+        b"test-key",
+        "local",
+        "http://localhost:8000",
+    )
+    .await
+    .expect_err("an empty in-memory database must not be migrated at startup");
+    assert!(error.to_string().contains("migrations are pending"));
+
+    let directory = tempfile::tempdir()?;
+    let url = format!(
+        "sqlite://{}?mode=rwc",
+        directory.path().join("test.sqlite").display()
+    );
+    let error = application(
+        Frontend::new(),
+        &url,
+        false,
+        b"test-key",
+        "local",
+        "http://localhost:8000",
+    )
+    .await
+    .expect_err("an empty database must not be migrated at startup");
+    assert!(error.to_string().contains("migrations are pending"));
+    let connection = aurelin_framework::database::connect(&url).await?;
+    use sea_orm::{ConnectionTrait, DbBackend, Statement};
+    let tables = connection.query_all(Statement::from_string(DbBackend::Sqlite,
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT IN ('seaql_migrations', 'sqlite_sequence')".to_owned())).await?;
+    assert!(
+        tables.is_empty(),
+        "startup created application tables: {tables:?}"
+    );
+    __AURELIN_CRATE__::database::migrate(&url).await?;
+    let _app = application(
+        Frontend::new(),
+        &url,
+        false,
+        b"test-key",
+        "local",
+        "http://localhost:8000",
+    )
+    .await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn initial_visit_contains_the_inertia_page_and_vite_entry() -> Result<(), Box<dyn Error>> {
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
+    let response = application(
+        Frontend::new(),
+        &database_url,
         false,
         b"test-key",
         "local",
@@ -42,9 +100,15 @@ async fn initial_visit_contains_the_inertia_page_and_vite_entry() -> Result<(), 
 async fn inertia_visit_returns_json_for_the_same_component() -> Result<(), Box<dyn Error>> {
     let frontend = Frontend::new();
     let version = frontend.version().to_owned();
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let response = application(
         frontend,
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",
@@ -70,9 +134,15 @@ async fn inertia_visit_returns_json_for_the_same_component() -> Result<(), Box<d
 #[tokio::test]
 async fn vite_assets_are_proxied_at_the_urls_used_by_the_document() -> Result<(), Box<dyn Error>> {
     let vite = fake_vite_server()?;
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let response = application(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",

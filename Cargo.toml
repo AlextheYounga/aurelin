@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/aurelin", "crates/aurelin-fortify", "crates/aurelin-framework", "crates/aurelin-passkeys"]
+members = ["crates/aurelin", "crates/aurelin-fortify", "crates/aurelin-framework", "crates/aurelin-passkeys", "crates/aurelin-sanctum"]
 resolver = "3"
 
 [workspace.package]

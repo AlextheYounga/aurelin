@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use aurelin_framework::database;
+use sea_orm::{ConnectionTrait, Statement, TransactionTrait};
 use sea_orm_migration::MigrationStatus;
 use sea_orm_migration::prelude::*;
 
@@ -59,5 +60,45 @@ async fn migration_commands_report_apply_rollback_and_rebuild_application_schema
     database::fresh::<TestMigrator>(&connection).await?;
     let status = database::migration_status::<TestMigrator>(&connection).await?;
     assert_eq!(status[0].1, MigrationStatus::Applied);
+    Ok(())
+}
+
+#[tokio::test]
+async fn sqlite_transactions_commit_successful_writes_and_rollback_failed_writes() -> Result<(), Box<dyn Error>> {
+    let connection = database::connect("sqlite::memory:").await?;
+    database::migrate::<TestMigrator>(&connection).await?;
+
+    let transaction = connection.begin().await?;
+    transaction
+        .execute(Statement::from_string(
+            transaction.get_database_backend(),
+            "INSERT INTO widgets (id) VALUES (1)".to_owned(),
+        ))
+        .await?;
+    transaction.commit().await?;
+
+    let result = connection
+        .transaction::<_, (), DbErr>(|transaction| {
+            Box::pin(async move {
+                transaction
+                    .execute(Statement::from_string(
+                        transaction.get_database_backend(),
+                        "INSERT INTO widgets (id) VALUES (2)".to_owned(),
+                    ))
+                    .await?;
+                Err(DbErr::Custom("abort transaction".into()))
+            })
+        })
+        .await;
+    assert!(result.is_err());
+
+    let rows = connection
+        .query_all(Statement::from_string(
+            connection.get_database_backend(),
+            "SELECT id FROM widgets ORDER BY id".to_owned(),
+        ))
+        .await?;
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].try_get::<i32>("", "id")?, 1);
     Ok(())
 }

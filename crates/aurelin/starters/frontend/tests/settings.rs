@@ -304,9 +304,15 @@ async fn settings_update_profile_password_and_delete_the_account() -> Result<(),
 
 #[tokio::test]
 async fn password_updates_are_limited_to_six_attempts_per_minute() -> Result<(), Box<dyn Error>> {
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",

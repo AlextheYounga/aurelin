@@ -20,9 +20,15 @@ use tower::ServiceExt;
 async fn confirmed_two_factor_setup_requires_a_code_or_single_use_recovery_code_at_login()
 -> Result<(), Box<dyn Error>> {
     let authentication_timebox_duration = Duration::from_secs(2);
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application_with_options(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",

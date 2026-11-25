@@ -13,16 +13,27 @@ use tower::ServiceExt;
 
 async fn application() -> Result<aurelin_framework::axum::Router, Box<dyn Error>> {
     let options = leptos::config::get_configuration(Some("Cargo.toml"))?.leptos_options;
-    __AURELIN_CRATE__::bootstrap::application(
+    let directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
+    let app = __AURELIN_CRATE__::bootstrap::application(
         options,
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-application-key-with-at-least-thirty-two-bytes",
         "testing",
         "http://localhost:8000",
         aurelin_framework::mail::Mailer::log(),
     )
-    .await
+    .await?;
+    Ok(
+        app.layer(aurelin_framework::axum::Extension(std::sync::Arc::new(
+            directory,
+        ))),
+    )
 }
 
 #[tokio::test]

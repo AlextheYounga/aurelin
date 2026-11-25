@@ -113,6 +113,14 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
       available.
 - [ ] Add consistent Laravel-style HTTP error rendering.
 
+### Personal access token API
+
+- [x] Provide opt-in React/Vue bearer token scaffolding and application-owned
+      SeaORM persistence, distinct from session and CSRF middleware.
+- [ ] Extend API generation to backend-only and WASM starters when those
+      starters have an appropriate authenticated token-issuance boundary.
+- [ ] Add shared HTTP validation error rendering in the validation milestone.
+
 ## 2. Inertia React and Vue foundation
 
 - [x] Integrate Inertia 3 with Axum through `inertia_rs`.
@@ -264,9 +272,10 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 ### Data and persistence
 
 - [ ] Define general SeaORM model, relationship, and query conventions.
-- [ ] Support application migrations outside the starter's auth schema.
+- [x] Support application migrations outside the starter's auth schema (SQLite post example).
 - [ ] Add database transactions and data-integrity conventions.
-- [ ] Add factories and seed data workflows.
+- [x] Add an application-owned deterministic post factory and explicit seed command (SQLite starters).
+- [ ] Expand factory and seeder conventions beyond the initial example.
 - [ ] Qualify supported database drivers beyond SQLite.
 
 ### Authorization, configuration, and tooling

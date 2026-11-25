@@ -81,6 +81,34 @@ fn generated_projects_use_published_aurelin_versions_by_default() -> TestResult 
 }
 
 #[test]
+fn api_selection_is_explicit_and_rejects_unsupported_starters_before_creation() -> TestResult {
+    let directory = TempDir::new()?;
+    for frontend in ["react", "vue"] {
+        let destination = directory.path().join(frontend);
+        let result = Command::new(env!("CARGO_BIN_EXE_aurelin"))
+            .args(["new", "--no-interaction", "--api", "--frontend", frontend])
+            .arg(&destination)
+            .output()?;
+        assert!(result.status.success(), "{}", String::from_utf8_lossy(&result.stderr));
+        assert!(fs::read_to_string(destination.join("Cargo.toml"))?.contains("aurelin-sanctum"));
+        assert!(destination.join("src/api/repository.rs").exists());
+    }
+    for frontend in [None, Some("wasm")] {
+        let destination = directory.path().join(frontend.unwrap_or("backend"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_aurelin"));
+        command.args(["new", "--no-interaction", "--api"]).arg(&destination);
+        if let Some(frontend) = frontend {
+            command.args(["--frontend", frontend]);
+        }
+        let result = command.output()?;
+        assert!(!result.status.success());
+        assert!(!destination.exists());
+        assert!(String::from_utf8(result.stderr)?.contains("--api requires"));
+    }
+    Ok(())
+}
+
+#[test]
 fn generated_wasm_projects_include_required_hidden_configuration() -> TestResult {
     let directory = TempDir::new()?;
     let destination = directory.path().join("app");
