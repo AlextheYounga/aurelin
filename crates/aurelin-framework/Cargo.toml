@@ -52,6 +52,7 @@ tower = "0.5"
 tower-sessions = "0.14"
 tracing = "0.1"
 url = "2"
+validator = { version = "0.20", features = ["derive"] }
 
 [lints]
 workspace = true
