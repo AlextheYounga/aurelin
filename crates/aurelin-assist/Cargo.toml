@@ -1,6 +1,6 @@
 [package]
 name = "aurelin-assist"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2024"
 authors.workspace = true
 description = "Local AI development context and debugging tools for Aurelin"
@@ -9,7 +9,7 @@ repository.workspace = true
 
 [dependencies]
 anyhow = "1"
-aurelin-framework = { version = "0.4.1", path = "../aurelin-framework" }
+aurelin-framework = { version = "0.4.2", path = "../aurelin-framework" }
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 rmcp = { version = "3.11", default-features = false, features = ["server", "macros", "transport-io"] }
