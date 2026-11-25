@@ -35,9 +35,15 @@ async fn application_registered_authentication_listener_observes_successful_regi
             Ok::<_, Infallible>(())
         }
     });
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application_with_options(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",
@@ -73,9 +79,15 @@ async fn application_registered_authentication_listener_observes_successful_regi
 #[tokio::test]
 async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
 -> Result<(), Box<dyn Error>> {
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",
@@ -432,9 +444,15 @@ async fn registration_login_throttling_and_logout_enforce_the_auth_boundaries()
 async fn failed_credentials_are_timeboxed_while_successful_credentials_return_early()
 -> Result<(), Box<dyn Error>> {
     let minimum_duration = Duration::from_secs(2);
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = __AURELIN_CRATE__::bootstrap::application_with_options(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         b"test-key",
         "local",

@@ -8,9 +8,7 @@ use crate::migrations::Migrator;
 
 pub async fn connect(url: &str) -> Result<DatabaseConnection, DbErr> {
     let database = database::connect(url).await?;
-    if url.contains(":memory:") {
-        database::migrate::<Migrator>(&database).await?;
-    } else if database::migration_status::<Migrator>(&database)
+    if database::migration_status::<Migrator>(&database)
         .await?
         .iter()
         .any(|(_, status)| *status == MigrationStatus::Pending)

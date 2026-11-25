@@ -2,8 +2,9 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use aurelin_framework::{
-    axum::{Router, response::Html},
+    axum::{Router, response::Response},
     inertia::axum::HtmlResponseContext,
+    view::inertia_ssr::{Ssr, SsrResponse, document_response},
 };
 use vite_rs_axum_0_8::ViteServe;
 
@@ -17,7 +18,7 @@ use crate::config::frontend::{
 use crate::config::frontend::{DEV_SCRIPT, FRAMEWORK};
 
 #[cfg(not(debug_assertions))]
-const PAGE_MARKER: &str = "__AURELIN_INERTIA_PAGE__";
+const BODY_MARKER: &str = "__AURELIN_INERTIA_BODY__";
 
 #[derive(vite_rs::Embed)]
 #[root = "."]
@@ -26,11 +27,22 @@ const PAGE_MARKER: &str = "__AURELIN_INERTIA_PAGE__";
 pub struct Assets;
 
 #[derive(Clone, Debug, Default)]
-pub struct Frontend;
+pub struct Frontend {
+    ssr: Ssr,
+}
 
 impl Frontend {
     pub fn new() -> Self {
-        Self
+        Self::default()
+    }
+
+    pub fn with_ssr(mut self, ssr: Ssr) -> Self {
+        self.ssr = ssr;
+        self
+    }
+
+    pub fn ssr(&self) -> Ssr {
+        self.ssr.clone()
     }
 
     pub fn version(&self) -> String {
@@ -48,8 +60,8 @@ impl Frontend {
             .route_service("/resources/{*path}", ViteServe::new(Assets::boxed()))
     }
 
-    pub fn document(&self, context: HtmlResponseContext) -> Html<String> {
-        Html(document_html(context.data_page()))
+    pub fn document(&self, context: HtmlResponseContext) -> Response {
+        document_response(context, document_html)
     }
 
     #[cfg(debug_assertions)]
@@ -75,28 +87,54 @@ impl aurelin_fortify::axum::FortifyFrontend for Frontend {
         }
     }
 
-    fn fortify_document(&self, context: HtmlResponseContext) -> Html<String> {
+    fn fortify_document(&self, context: HtmlResponseContext) -> Response {
         self.document(context)
     }
 }
 
 #[cfg(debug_assertions)]
-fn document_html(page: &str) -> String {
+fn document_html(context: &HtmlResponseContext, rendered: Option<&SsrResponse>) -> String {
+    let page = context.data_page();
+    let head = rendered.map_or_else(String::new, |ssr| ssr.head.join("\n"));
+    let title = if head.contains("<title") {
+        ""
+    } else {
+        "<title>Aurelin</title>"
+    };
+    let body = rendered.map_or_else(
+        || format!(r#"<script type="application/json" data-page="app">{page}</script><div id="app"></div>"#),
+        |ssr| ssr.body.clone(),
+    );
     let react_refresh = if FRAMEWORK == "react" {
         r#"<script type="module">import RefreshRuntime from "/@react-refresh";RefreshRuntime.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>type=>type;window.__vite_plugin_react_preamble_installed__=true;</script>"#
     } else {
         ""
     };
     format!(
-        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Aurelin</title>{react_refresh}<script type="module" src="/@vite/client"></script><script type="module" src="/{DEV_SCRIPT}"></script></head><body><script type="application/json" data-page="app">{page}</script><div id="app"></div></body></html>"#,
+        r#"<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">{title}{head}{react_refresh}<script type="module" src="/@vite/client"></script><script type="module" src="/{DEV_SCRIPT}"></script></head><body>{body}</body></html>"#,
     )
 }
 
 #[cfg(not(debug_assertions))]
-fn document_html(page: &str) -> String {
+fn document_html(context: &HtmlResponseContext, rendered: Option<&SsrResponse>) -> String {
     Assets::get("index.html").map_or_else(
         || "Frontend assets are missing. Build the application in release mode again.".into(),
-        |index| String::from_utf8_lossy(&index.bytes).replace(PAGE_MARKER, page),
+        |index| {
+            let html = String::from_utf8_lossy(&index.bytes);
+            if let Some(ssr) = rendered {
+                let head = ssr.head.join("\n");
+                let html = if head.contains("<title") { html.replace("<title>Aurelin</title>", "") } else { html.into_owned() };
+                html.replace("</head>", &format!("{head}</head>")).replace(BODY_MARKER, &ssr.body)
+            } else {
+                html.replace(
+                    BODY_MARKER,
+                    &format!(
+                        r#"<script type="application/json" data-page="app">{}</script><div id="app"></div>"#,
+                        context.data_page()
+                    ),
+                )
+            }
+        },
     )
 }
 

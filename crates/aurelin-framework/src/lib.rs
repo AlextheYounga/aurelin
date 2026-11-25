@@ -20,6 +20,7 @@ pub mod signed_url;
 pub mod storage;
 pub mod timebox;
 pub mod uploads;
+pub mod validation;
 pub mod view;
 
 pub use axum;

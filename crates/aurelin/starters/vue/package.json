@@ -1,10 +1,16 @@
 {
   "private": true,
   "type": "module",
+  "engines": { "node": ">=22" },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vue-tsc --noEmit && vite build",
-    "typecheck": "vue-tsc --noEmit"
+    "build:all": "npm run build && npm run build:ssr",
+    "typecheck": "vue-tsc --noEmit",
+    "build:ssr": "vite build --ssr resources/js/ssr.ts --outDir bootstrap/ssr",
+    "start:ssr": "node bootstrap/ssr/ssr.js",
+    "health:ssr": "curl --fail --silent --show-error http://127.0.0.1:13714/health",
+    "stop:ssr": "curl --fail --silent http://127.0.0.1:13714/shutdown || [ $? -eq 52 ]"
   },
   "dependencies": {
     "@inertiajs/vue3": "^3.11.0",

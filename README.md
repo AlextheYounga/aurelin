@@ -22,6 +22,7 @@ integration decisions.
 - Graceful shutdown and health checks
 - Inertia 3 integration for React 19 and Vue 3
 - Vite development and embedded production assets
+- Inertia SSR for React and Vue with a separately managed Node.js 22+ renderer
 - Leptos SSR and WebAssembly hydration without Node.js
 - SQLite persistence with SeaORM
 - Persisted sessions and CSRF protection
@@ -86,6 +87,33 @@ Generated applications use the matching Aurelin crates from crates.io. Aurelin
 contributors can pass `--framework-path` to test against a local framework
 checkout instead.
 
+### Personal access tokens
+
+React and Vue applications can opt into bearer-token API routes:
+
+```sh
+aurelin new my-app --frontend react --api
+```
+
+The backend-only and WASM starters do not currently support this option: they
+do not share the browser authentication composition used for token management.
+Run `cargo aurelin migrate` before serving the generated application.
+
+Browser sessions remain cookie-authenticated and CSRF-protected. A signed-in
+user can `POST /tokens` with a CSRF token and JSON such as
+`{"name":"laptop","abilities":["read"],"expires_at":null}`; the response
+contains the plaintext credential only once. `GET /tokens` lists the owner's
+metadata and `DELETE /tokens/{id}` revokes an owned token. Issuance is rate
+limited; wildcard (`*`) issuance is denied until the application explicitly
+changes its policy. Expiration is an optional Unix timestamp in seconds.
+
+Send `Authorization: Bearer <credential>` to `GET /api/user`, or
+`DELETE /api/token` to revoke the current credential. These routes do not accept
+session cookies as authentication, and bearer headers do not bypass CSRF on
+browser routes. Only a SHA-256 digest is stored; protect the plaintext token as
+a password. Abilities constrain token access but do not replace application
+authorization policies. This is not OAuth or JWT authentication.
+
 ## The Aurelin approach
 
 Rust has excellent web libraries. Aurelin does not hide or duplicate them. It
@@ -109,6 +137,34 @@ and gives each concern a clear home.
 Applications still use these libraries through their native APIs. Aurelin is
 the convention and integration layer, not a second abstraction over
 everything beneath it.
+
+For JSON APIs, `aurelin_framework::validation::http::Validated` composes
+`validator` and Axum extractors for JSON, forms, query strings, and paths. It
+returns safe JSON errors, including structured rule codes, on invalid input.
+Apply authorization in an outer route layer or an earlier parts extractor:
+authorization inside the handler runs after validation. For browser/Inertia
+forms, use `validation::browser::BrowserValidated` instead: implement
+`OldInput` on the request type to explicitly select non-sensitive plain-text
+fields, install `flash_middleware` inside the session layer, and call
+`validation_page_props` with each Inertia page's props before rendering.
+Never select passwords, credentials, tokens, secrets, or uploaded content.
+This explicit projection is application-owned and cannot be checked by the
+framework. Use an empty projection when no input is safe to flash.
+
+Browser failures redirect to the same-host Referer path (or `/`); PUT, PATCH,
+DELETE and QUERY use 303, other methods use 302. X-Inertia requests redirect
+even when they accept JSON. Other JSON requests keep structured JSON errors.
+Malformed or unsupported payloads return safe JSON errors for all clients;
+only semantic validation failures are redirected.
+The `X-Inertia-Error-Bag` header selects an optional bag. Errors use the first
+message per field and old input is exposed as `old`. Flash data is removed on
+the next request, including unrelated requests; concurrent requests may race,
+and there is no automatic reflash across extra redirects or asset-version
+reloads. Unlike Laravel, input is not flashed by default. `inertia_rs` 0.4
+inserts its default `errors` before shared-prop resolution, so the page-prop
+helper is required rather than registering an `errors` shared prop.
+Applications may opt into `http::errors::AppError` and register their own Axum
+404/405 fallbacks; this does not change existing authentication responses.
 
 ## Packages
 

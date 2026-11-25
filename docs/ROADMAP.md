@@ -112,6 +112,14 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [x] Wire a health diagnostic event hook and failure response to the event dispatcher.
 - [ ] Add consistent Laravel-style HTTP error rendering.
 
+### Personal access token API
+
+- [x] Provide opt-in React/Vue bearer token scaffolding and application-owned
+      SeaORM persistence, distinct from session and CSRF middleware.
+- [ ] Extend API generation to backend-only and WASM starters when those
+      starters have an appropriate authenticated token-issuance boundary.
+- [ ] Add shared HTTP validation error rendering in the validation milestone.
+
 ## 2. Inertia React and Vue foundation
 
 - [x] Integrate Inertia 3 with Axum through `inertia_rs`.
@@ -126,7 +134,7 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [x] Compile, lint, test, and typecheck generated React and Vue applications.
 - [ ] Reassess async prop support against future starter requirements.
 - [ ] Reassess validation error bags where `inertia_rs` remains partial.
-- [ ] Add Inertia SSR in the later SSR milestone.
+- [x] Add Inertia SSR for generated React and Vue applications.
 
 ## 3. Built-in authentication starter
 
@@ -262,9 +270,10 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 ### Data and persistence
 
 - [ ] Define general SeaORM model, relationship, and query conventions.
-- [ ] Support application migrations outside the starter's auth schema.
+- [x] Support application migrations outside the starter's auth schema (SQLite post example).
 - [ ] Add database transactions and data-integrity conventions.
-- [ ] Add factories and seed data workflows.
+- [x] Add an application-owned deterministic post factory and explicit seed command (SQLite starters).
+- [ ] Expand factory and seeder conventions beyond the initial example.
 - [ ] Qualify supported database drivers beyond SQLite.
 
 ### Authorization, configuration, and tooling
@@ -336,7 +345,6 @@ does not by itself complete a capability.
 
 ## Deferred work
 
-- Inertia SSR.
 - Full browser WebAuthn qualification pending an approved reliable test setup.
 
 ## Excluded work

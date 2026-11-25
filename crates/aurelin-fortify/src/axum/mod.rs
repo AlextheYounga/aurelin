@@ -9,7 +9,7 @@ use aurelin_framework::{
     axum::{
         Router,
         http::StatusCode,
-        response::{Html, IntoResponse, Response},
+        response::{IntoResponse, Response},
     },
     events::EventDispatcher,
     inertia::axum::{HtmlResponseContext, InertiaError},
@@ -56,7 +56,7 @@ pub struct FortifyComponents {
 
 pub trait FortifyFrontend: Clone + Send + Sync + 'static {
     fn fortify_components(&self) -> FortifyComponents;
-    fn fortify_document(&self, context: HtmlResponseContext) -> Html<String>;
+    fn fortify_document(&self, context: HtmlResponseContext) -> Response;
 }
 
 pub trait FortifyUser: AuthUser<Id = i64> + Clone + Send + Sync + 'static {

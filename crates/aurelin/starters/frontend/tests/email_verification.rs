@@ -16,9 +16,15 @@ use tower::ServiceExt;
 #[tokio::test]
 async fn a_signed_link_verifies_the_authenticated_users_email() -> Result<(), Box<dyn Error>> {
     let application_key = b"test-key";
+    let database_directory = tempfile::tempdir()?;
+    let database_url = format!(
+        "sqlite://{}?mode=rwc",
+        database_directory.path().join("test.sqlite").display()
+    );
+    __AURELIN_CRATE__::database::migrate(&database_url).await?;
     let app = application(
         Frontend::new(),
-        "sqlite::memory:",
+        &database_url,
         false,
         application_key,
         "local",
