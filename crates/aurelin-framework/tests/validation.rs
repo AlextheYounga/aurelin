@@ -33,9 +33,12 @@ fn arbitrary_custom_parameters_are_not_exposed() {
     let mut errors = validator::ValidationErrors::new();
     let mut error = ValidationError::new("custom_rule");
     error.add_param("token".into(), &"sensitive");
+    error.message = Some("sensitive".into());
     errors.add("field", error);
     let issue = &issues(&errors, None)[0];
     assert_eq!(issue.code, "custom_rule");
     assert!(issue.arguments.is_empty());
     assert!(!serde_json::to_string(issue).expect("issue serializes").contains("sensitive"));
+    assert_eq!(issue.render_message(), "The field field is invalid.");
+    assert_eq!(issue.clone().with_safe_message("Please retry.").render_message(), "Please retry.");
 }

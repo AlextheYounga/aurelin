@@ -15,16 +15,57 @@ use validator::{ValidationErrors, ValidationErrorsKind};
 pub struct ValidationIssue {
     pub field: String,
     pub code: String,
-    pub message: String,
+    pub descriptor: MessageDescriptor,
     pub arguments: BTreeMap<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bag: Option<String>,
 }
 
+/// A safe, unrendered default message. Validator-provided messages are not trusted.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MessageDescriptor {
+    Email,
+    Url,
+    Length,
+    Range,
+    Required,
+    Invalid,
+    /// Application-provided text explicitly approved for public display.
+    Custom(String),
+}
+
+impl ValidationIssue {
+    /// Replace the default with application-owned text safe for public display.
+    pub fn with_safe_message(mut self, message: impl Into<String>) -> Self {
+        self.descriptor = MessageDescriptor::Custom(message.into());
+        self
+    }
+
+    /// Render the descriptor at the presentation boundary.
+    pub fn render_message(&self) -> String {
+        match &self.descriptor {
+            MessageDescriptor::Custom(message) => message.clone(),
+            descriptor => {
+                let description = match descriptor {
+                    MessageDescriptor::Email => "must be a valid email address",
+                    MessageDescriptor::Url => "must be a valid URL",
+                    MessageDescriptor::Length => "has an invalid length",
+                    MessageDescriptor::Range => "is out of range",
+                    MessageDescriptor::Required => "is required",
+                    MessageDescriptor::Invalid => "is invalid",
+                    MessageDescriptor::Custom(_) => unreachable!(),
+                };
+                format!("The {} field {}.", self.field, description)
+            }
+        }
+    }
+}
+
 /// Convert validator errors without exposing rejected values or custom parameters.
 ///
-/// Custom rule messages must themselves be safe to display; custom rule codes
-/// are part of the application's public contract.
+/// Validator messages are ignored because custom validators can embed input.
+/// Custom rule codes are part of the application's public contract.
 pub fn issues(errors: &ValidationErrors, bag: Option<&str>) -> Vec<ValidationIssue> {
     let mut result = Vec::new();
     collect(errors, "", bag, &mut result);
@@ -52,12 +93,10 @@ fn collect(errors: &ValidationErrors, prefix: &str, bag: Option<&str>, result: &
                             }
                         }
                     }
-                    let message =
-                        error.message.as_ref().map_or_else(|| default_message(&path, &error.code), ToString::to_string);
                     result.push(ValidationIssue {
                         field: path.clone(),
                         code: error.code.to_string(),
-                        message,
+                        descriptor: descriptor(&error.code),
                         arguments,
                         bag: bag.map(str::to_owned),
                     });
@@ -67,13 +106,13 @@ fn collect(errors: &ValidationErrors, prefix: &str, bag: Option<&str>, result: &
     }
 }
 
-fn default_message(field: &str, code: &str) -> String {
+fn descriptor(code: &str) -> MessageDescriptor {
     match code {
-        "email" => format!("The {field} field must be a valid email address."),
-        "url" => format!("The {field} field must be a valid URL."),
-        "length" => format!("The {field} field has an invalid length."),
-        "range" => format!("The {field} field is out of range."),
-        "required" => format!("The {field} field is required."),
-        _ => format!("The {field} field is invalid."),
+        "email" => MessageDescriptor::Email,
+        "url" => MessageDescriptor::Url,
+        "length" => MessageDescriptor::Length,
+        "range" => MessageDescriptor::Range,
+        "required" => MessageDescriptor::Required,
+        _ => MessageDescriptor::Invalid,
     }
 }
