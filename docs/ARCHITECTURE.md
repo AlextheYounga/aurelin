@@ -297,6 +297,66 @@ This is a deliberate Laravel 13 subset. Tags, stale-while-revalidate,
 memoization, cache events, failover, custom driver registration, a multiple
 named-store manager, and PHP serialization compatibility remain deferred.
 
+### Filesystems and uploads
+
+Laravel's reusable disk behavior belongs to `illuminate/filesystem`, layered on
+Flysystem, while uploaded-file request behavior belongs to `illuminate/http`.
+Aurelin keeps the corresponding integration in `aurelin-framework::storage`
+and `aurelin-framework::uploads`. Applications explicitly construct disks and
+own provider credentials, disk selection, route authorization, validation,
+destination directories, and persistence of returned paths. There is no global
+disk manager or storage behavior copied into generated applications.
+
+`Disk` is a cloneable handle over `Arc<dyn object_store::ObjectStore>`. It can
+wrap a caller-supplied store under an optional `PrefixStore` or construct an
+`object_store::local::LocalFileSystem` rooted at an explicit directory. The
+implemented contract includes exists/missing, buffered get/put, streamed reads
+and multipart writes, idempotent deletion, copy, move, size and last-modified
+metadata, and object listing. Buffered `get` is deliberately distinct from
+`read_stream`. Streamed writes use fixed multipart chunks, apply backpressure,
+publish only after completion, and explicitly abort when the input stream or an
+in-flight part fails. Writes replace existing objects; deleting a missing object
+succeeds. Backend failures remain errors rather than being reported as misses.
+
+`StoragePath` accepts only non-empty disk-relative object paths. It rejects
+absolute Unix and Windows paths, parent traversal, empty segments, trailing
+separators, backslashes, NUL/control characters, and malformed object-store
+segments without rewriting them into another path. Prefix stores keep disks
+over one backend isolated. The local driver follows symbolic links, including
+links outside its configured root. This matches `object_store` and Laravel's
+direct local read/write behavior: the configured root is a trusted operational
+boundary and must not be writable by an attacker. Aurelin does not claim
+symlink-resistant operating-system confinement.
+
+A configured public base URL is only a URL-generation capability; it does not
+change object access. Each validated path segment is appended through `url::Url`
+encoding, preserving the configured base path. Disks without a base URL return
+an unsupported-capability error. The generic `ObjectStore` contract cannot
+faithfully change public/private ACLs, detect MIME types, or sign provider URLs,
+so visibility mutation and temporary URLs return explicit capability errors.
+No in-memory visibility flag or home-grown signature is used.
+
+HTTP applications derive strict typed forms with `axum-typed-multipart` 0.17.0.
+Every file and text field declares its streaming field limit, strict schemas
+reject unknown and duplicate fields, and Axum's body-limit layer caps the whole
+request. Forms requiring a bounded field count must avoid unbounded `Vec`
+fields. File fields stream to `NamedTempFile`; dropping a rejected or
+validation-failed form removes that temporary file. Applications authorize and
+validate before calling `store_upload`, which streams the accepted temporary
+file to the selected disk and returns its generated path, byte length, and the
+client filename and content type explicitly labeled as untrusted metadata.
+Opaque 40-character random names never contain the client filename or infer an
+extension or MIME type from it. Empty files are accepted and stored as empty
+objects. Multipart rejection bodies remain those of the selected extractor;
+Aurelin does not expose backend errors or credentials to clients.
+
+The generic contract is verified against `object_store::memory::InMemory`, and
+the local contract against real temporary directories. This qualifies generic
+object semantics and the local driver only. AWS, GCP, Azure, S3-compatible
+services, ACL visibility, MIME detection, provider signing, multiple deletion,
+checksums, directory mutation, append/prepend, downloads, and cloud credentials
+remain unqualified or deferred.
+
 ### Events
 
 Laravel's reusable event dispatcher is owned by the `illuminate/events`

@@ -318,8 +318,14 @@ does not by itself complete a capability.
 
 ### Filesystems and uploads
 
-- [ ] Implement local and object-storage disks with `object_store`.
-- [ ] Implement safe uploads, URLs, visibility, and streaming limits.
+- [x] Implement qualified local and generic object-storage disks with
+      `object_store`, safe relative paths, prefixes, streaming, metadata, copy,
+      move, and explicit missing-object behavior.
+- [x] Implement streamed temporary multipart uploads, total/per-field/schema
+      limits, opaque names, encoded configured public URLs, and explicit
+      unsupported visibility and signing capabilities.
+- [ ] Qualify cloud-provider configuration, portable visibility or ACL support,
+      MIME detection, and provider-backed temporary URLs.
 
 ### Localization and outbound HTTP
 
