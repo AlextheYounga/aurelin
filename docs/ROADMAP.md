@@ -109,7 +109,7 @@ experience, SQLite persistence, and a usable queue worker and job workflow.
 - [x] Shut down gracefully after Ctrl+C.
 - [x] Test generated applications through their compiled process and HTTP
       boundary.
-- [ ] Wire Laravel's health diagnostic event hook to the existing event dispatcher.
+- [x] Wire a health diagnostic event hook and failure response to the event dispatcher.
 - [ ] Add consistent Laravel-style HTTP error rendering.
 
 ## 2. Inertia React and Vue foundation

@@ -64,9 +64,16 @@ produce a failing process status. The starter includes:
   is requested;
 - Axum's native 404 and method-not-allowed behavior.
 
-The health route currently establishes only the default healthy response. The
-existing event dispatcher is not yet wired to Laravel's `DiagnosingHealth` hook
-or its failure path.
+The framework health handler dispatches `DiagnosingHealth` through the supplied
+event dispatcher. A failed listener returns HTTP 500 and a `down` JSON status,
+without exposing its error to the client. Generated routes install an empty
+dispatcher by default; applications register diagnostic listeners when composing
+the route. The handler does not implement Laravel's debug-mode exception behavior
+or health page rendering.
+The reference is Laravel Framework 13.x commit
+`321caf77d6c037577434e177c3bf280abb2b3513`, specifically
+`src/Illuminate/Foundation/Http/HealthCheck.php` and
+`src/Illuminate/Foundation/Events/DiagnosingHealth.php`.
 
 ### Inertia protocol
 
@@ -405,8 +412,8 @@ events, broadcasting, and queued listeners also remain deferred. A future
 queued-listener adapter can register through the existing async listener seam
 and use Apalis without coupling this dispatcher to the queue today.
 
-Authentication and health diagnostic events remain unwired consumers of this
-foundation. Gate evaluation events are described in the authorization section.
+Authentication events remain an unwired consumer of this foundation. Health and
+gate evaluation events are described in their respective sections.
 
 ### Notifications and mail
 
